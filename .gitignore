@@ -1,0 +1,15 @@
+# Entornos virtuales
+venv/
+.venv/
+
+# Variables de entorno y credenciales
+.env
+.env.*
+!.env.example
+
+# Archivos generados por Python
+__pycache__/
+*.py[cod]
+
+# Cachés de pruebas
+.pytest_cache/
