@@ -38,4 +38,5 @@ def obtener_dato_de_prueba(pregunta):
      return datos["candidates"][0]["content"]["parts"][0]["text"]
 
 # Ejecuta la función con una pregunta de prueba e imprime el texto generado.
-print(obtener_dato_de_prueba("Confirma en una frase corta que esta conexion funciona"))
+if __name__ == "__main__":
+   print(obtener_dato_de_prueba("¿Cual es la capital de Escocia?"))
