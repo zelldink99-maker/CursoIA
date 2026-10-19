@@ -1,3 +1,4 @@
+"""
 # Importa la función sumar desde el módulo local aritmetica.py.
 from aritmetica import sumar
 
@@ -22,3 +23,8 @@ print(respuesta_dict["detalles"]["modelo"])
 
 # Intenta consultar una clave que no existe; esta línea provoca un KeyError.
 print(respuesta_dict["color"])
+"""
+
+from consumir_gemini import obtener_dato_de_prueba
+
+print(obtener_dato_de_prueba("¿Cual es la capital de Inglaterra?"))
