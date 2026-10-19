@@ -1,4 +1,5 @@
 """Consulta la API de Gemini y valida sus respuestas."""
+#Codigo refactorizado y con excepciones para manejar errores de conexión, HTTP y formato de respuesta.
 
 import os
 import sys

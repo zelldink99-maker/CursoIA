@@ -25,6 +25,8 @@ print(respuesta_dict["detalles"]["modelo"])
 print(respuesta_dict["color"])
 """
 
+
+#Test
 from consumir_gemini import obtener_dato_de_prueba
 
 print(obtener_dato_de_prueba("¿Cual es la capital de Inglaterra?"))
