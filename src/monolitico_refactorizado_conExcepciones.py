@@ -96,7 +96,6 @@ def obtener_dato_de_prueba(pregunta: str) -> str:
 if __name__ == "__main__":
     # Muestra el resultado o informa errores esperables sin imprimir un traceback.
     try:
-        pregunta =input("Ingrese su pregunta:")
-        print(obtener_dato_de_prueba(pregunta))
+        print(obtener_dato_de_prueba("¿Cual es la capital de Escocia?"))
     except (RuntimeError, ValueError) as error:
         print(f"Error: {error}")

@@ -1,42 +1,137 @@
-# os permite leer la clave guardada en las variables de entorno.
+"""Consulta la API de Gemini y valida sus respuestas."""
+
 import os
+import sys
+from pathlib import Path
 
-# requests envía la solicitud HTTP a la API de Gemini.
 import requests
-
-# load_dotenv carga en el entorno las variables definidas en el archivo .env.
 from dotenv import load_dotenv
-  
-# Busca y carga las variables del archivo .env.
-load_dotenv()
-  
-# Envía una pregunta a Gemini y devuelve el texto generado.
-def obtener_dato_de_prueba(pregunta):
-     # Obtiene la clave de API configurada como GEMINI_API_KEY.
-     api_key = os.getenv("GEMINI_API_KEY")
 
-     # Indica qué modelo de Gemini se utilizará.
-     modelo = "gemini-3.5-flash"
 
-     # Construye la URL del endpoint e incluye la clave para autenticar la llamada.
-     url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
+# Mantiene la configuración independiente del directorio desde el que se ejecute.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+ENV_PATH = PROJECT_ROOT / ".env"
+MODEL = "gemini-3.5-flash"
+API_URL = (
+    f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
+)
+REQUEST_TIMEOUT = 30
 
-     # Organiza la pregunta en el formato que espera la API.
-     body = {
-     	"contents": [
-         	{"parts": [{"text": pregunta}]}
-     	]
-     }
+# Carga el .env del proyecto sin sobrescribir variables ya definidas en el sistema.
+load_dotenv(dotenv_path=ENV_PATH)
 
-     # Envía la pregunta como una solicitud POST con el cuerpo en formato JSON.
-     respuesta = requests.post(url, json=body)
 
-     # Convierte la respuesta JSON recibida en un diccionario de Python.
-     datos = respuesta.json()
+def _obtener_api_key() -> str:
+    """Devuelve la clave de API o indica cómo configurar una."""
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key or api_key == "tu_llave_aqui":
+        raise RuntimeError(
+            f"Configura GEMINI_API_KEY con una clave válida en {ENV_PATH}."
+        )
+    return api_key
 
-     # Extrae y devuelve el texto de la primera respuesta generada por Gemini.
-     return datos["candidates"][0]["content"]["parts"][0]["text"]
 
-# Ejecuta la función con una pregunta de prueba e imprime el texto generado.
+def _mensaje_error(respuesta: requests.Response) -> str:
+    """Extrae el detalle del error HTTP, usando el cuerpo como alternativa."""
+    try:
+        datos = respuesta.json()
+    except ValueError:
+        datos = None
+
+    if isinstance(datos, dict):
+        error = datos.get("error")
+        if isinstance(error, dict):
+            mensaje = error.get("message")
+            if isinstance(mensaje, str) and mensaje:
+                return mensaje
+
+    return respuesta.text.strip() or "La respuesta no incluyó detalles."
+
+
+def _extraer_texto(datos: object) -> str:
+    """Valida la estructura JSON de Gemini y concatena las partes de texto."""
+    if not isinstance(datos, dict):
+        raise RuntimeError("Gemini devolvió una respuesta con un formato inesperado.")
+
+    candidatos = datos.get("candidates")
+    if not isinstance(candidatos, list) or not candidatos:
+        raise RuntimeError("Gemini no devolvió candidatos con contenido.")
+
+    candidato = candidatos[0]
+    if not isinstance(candidato, dict):
+        raise RuntimeError("Gemini devolvió un candidato con un formato inesperado.")
+
+    contenido = candidato.get("content")
+    if not isinstance(contenido, dict):
+        raise RuntimeError("Gemini no devolvió contenido en su respuesta.")
+
+    partes = contenido.get("parts")
+    if not isinstance(partes, list):
+        raise RuntimeError("Gemini devolvió contenido con un formato inesperado.")
+
+    textos = [
+        parte["text"]
+        for parte in partes
+        if isinstance(parte, dict) and isinstance(parte.get("text"), str)
+    ]
+    if not textos:
+        raise RuntimeError("Gemini no devolvió texto en su respuesta.")
+
+    return "".join(textos)
+
+
+def obtener_dato_de_prueba(pregunta: str) -> str:
+    """Envía una pregunta a Gemini y devuelve el texto generado.
+
+    Lanza ValueError para preguntas inválidas y RuntimeError para problemas de
+    configuración, conexión, HTTP o formato de la respuesta.
+    """
+    if not isinstance(pregunta, str) or not pregunta.strip():
+        raise ValueError("La pregunta debe ser un texto no vacío.")
+
+    api_key = _obtener_api_key()
+
+    # Envía la clave en un encabezado para no exponerla en la URL de la solicitud.
+    try:
+        respuesta = requests.post(
+            API_URL,
+            headers={"x-goog-api-key": api_key},
+            json={"contents": [{"parts": [{"text": pregunta}]}]},
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.Timeout as error:
+        raise RuntimeError("La solicitud a Gemini superó el tiempo de espera.") from error
+    except requests.ConnectionError as error:
+        raise RuntimeError("No se pudo conectar con la API de Gemini.") from error
+    except requests.RequestException as error:
+        raise RuntimeError(
+            f"No se pudo completar la solicitud a Gemini: {error}"
+        ) from error
+
+    if not respuesta.ok:
+        raise RuntimeError(
+            f"Error de Gemini ({respuesta.status_code}): {_mensaje_error(respuesta)}"
+        )
+
+    try:
+        datos = respuesta.json()
+    except ValueError as error:
+        raise RuntimeError(
+            "Gemini devolvió una respuesta que no es JSON válido."
+        ) from error
+
+    return _extraer_texto(datos)
+
+
+def _main() -> int:
+    """Ejecuta una consulta de ejemplo e informa fallos esperables al usuario."""
+    try:
+        print(obtener_dato_de_prueba("¿Cuál es la capital de Escocia?"))
+    except (RuntimeError, ValueError) as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
 if __name__ == "__main__":
-   print(obtener_dato_de_prueba("¿Cual es la capital de Escocia?"))
+    raise SystemExit(_main())
