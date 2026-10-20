@@ -22,7 +22,7 @@ Este flujo corresponde a `src/consumir_gemini.py` y `src/monolitico_refactorizad
 
 ## Medición de latencia y estimación de costo
 
-`src/latencia.py` realiza cuatro solicitudes de prueba usando las funciones de `src/monolitico.py`, imprime el tiempo de cada solicitud y su promedio. Después estima el costo de la última respuesta mediante `calcular_costo`, de `src/costo.py`, usando los contadores de tokens de `usageMetadata`.
+La clase `Latencia`, en `src/latencia.py`, realiza cuatro solicitudes de prueba por defecto usando las funciones de `src/monolitico.py`, imprime el tiempo de cada solicitud y su promedio. Después estima el costo de la última respuesta mediante `calcular_costo`, de `src/costo.py`, usando los contadores de tokens de `usageMetadata`. La prueba se ejecuta al lanzar el módulo o llamar `Latencia.ejecutar()`; importarlo no realiza solicitudes.
 
 Las tarifas configuradas en el script son `0,00000010 USD` por token de entrada y `0,00000030 USD` por token de salida (equivalentes a `0,0001 USD` y `0,0003 USD` por cada 1.000 tokens, respectivamente). Son valores escritos en el código, no una consulta dinámica de precios; deben actualizarse si cambia la tarifa del proveedor.
 
@@ -38,6 +38,10 @@ Los valores siguientes se conservaron en la documentación del proyecto con fech
 | Calidad registrada en tres preguntas | Buena: cubrió lo esencial | Muy buena: ofreció más detalle y matices |
 | Fecha del registro | 2026-09-08 | 2026-09-08 |
 
-## Justificación y alternativa descartada
+## Justificación
 
-Según la comparación histórica, se eligió el Modelo A porque cubría las necesidades de la miniaplicación con menor costo y latencia que el Modelo B. La diferencia de detalle atribuida al Modelo B no se consideró necesaria para el caso de uso. Como el código y el registro no identifican ese candidato alternativo, conviene confirmar su nombre y repetir la comparación antes de reutilizar estos resultados como una evaluación vigente.
+Según la comparación histórica, se eligió el Modelo A porque cubría las necesidades de la miniaplicación con menor costo y latencia que el Modelo B. La calidad de sus respuestas se consideró suficiente para el caso de uso.
+
+## Alternativa descartada y por qué
+
+Se descartó el Modelo B porque, aunque ofrecía respuestas con más detalle y matices, registró mayor costo y latencia, y ese nivel adicional de detalle no se consideró necesario. El código y el registro no identifican el nombre del Modelo B; conviene confirmarlo y repetir la comparación antes de tomar estos resultados como una evaluación vigente.
