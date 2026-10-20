@@ -23,4 +23,5 @@ def obtener_dato_de_prueba(pregunta):
     datos = enviar_peticion(url, body)
     return extraer_texto(datos)
 
-print(obtener_dato_de_prueba("Confirma en una frase corta que esta conexión funciona"))
+if __name__ == "__main__":
+    print(obtener_dato_de_prueba("Confirma en una frase corta que esta conexión funciona"))
