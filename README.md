@@ -41,29 +41,37 @@ Estos pasos se completan de forma progresiva durante la Unidad U1.2:
 Desde la raíz del repositorio ejecuta:
 
 ```powershell
-python src\latencia.py
+python src\GATE_1\latencia.py
 ```
 
-La clase `Latencia`, definida en `src/latencia.py`, realiza cuatro solicitudes
-con la pregunta de prueba predeterminada. Informa el tiempo de cada solicitud,
-el promedio y una estimación del costo de la última respuesta. Las tarifas por
-token están definidas en el módulo y deben revisarse frente a los precios
-actuales del proveedor.
+La clase `Latencia`, definida en `src/GATE_1/latencia.py`, realiza cuatro
+solicitudes con la pregunta de prueba predeterminada. Informa el tiempo de cada
+solicitud, el promedio y una estimación del costo de la última respuesta. Las
+tarifas por token están definidas en el módulo y deben revisarse frente a los
+precios actuales del proveedor. Ejecuta el archivo directamente como se muestra;
+no uses `-m src.GATE_1.latencia`, ya que sus imports de módulos hermanos no
+están configurados para la ejecución como módulo de paquete.
 
-También puedes configurar la prueba desde Python:
+## Revisar GATE_1
 
-```python
-from src.latencia import Latencia
+Desde la raíz del repositorio ejecuta el verificador:
 
-prueba = Latencia(
-    pregunta="¿Cuál es la capital de Escocia?",
-    intentos=2,
-)
-promedio = prueba.ejecutar()
+```powershell
+python src\GATE_1\revision_gate_1.py
 ```
 
-La petición y la medición solo se ejecutan al llamar `ejecutar()` o al lanzar
-el módulo directamente; importar `Latencia` no realiza llamadas a la API.
+Describe los módulos `api_test`, `consumir_gemini`, `costo`, `latencia`,
+`main`, `module_test`, `monolitico` y `peticiones`; valida sintaxis,
+dependencias, imports y credenciales, y ejecuta pruebas locales simuladas.
+También comprueba por defecto la disponibilidad de Gemini con una petición
+real. Configura `GEMINI_API_KEY` en `.env` antes de ejecutarlo. La clave no se
+imprime; la prueba real puede generar un costo mínimo de API.
+
+Para omitir la prueba de red y dejar el check de disponibilidad pendiente:
+
+```powershell
+python src\GATE_1\revision_gate_1.py --omitir-api
+```
 
 ## Estructura de carpetas
 

@@ -2,9 +2,12 @@
 
 import time
 from typing import Any
+
+# Estos módulos se importan desde el directorio GATE_1 al ejecutar este script.
 from costo import calcular_costo
 from monolitico import armar_peticion, enviar_peticion
 
+# Tarifas aproximadas expresadas en dólares por token; actualizarlas si cambian.
 PRECIO_ENTRADA = 0.00000010
 PRECIO_SALIDA = 0.00000030
 PREGUNTA_PREDETERMINADA = "Confirma en una frase corta que esta conexión funciona"
@@ -34,11 +37,13 @@ class Latencia:
 
     def medir_solicitudes(self) -> dict[str, Any]:
         """Envía las solicitudes configuradas, mide su duración y devuelve la última respuesta."""
+        # Reinicia la medición para que una segunda ejecución no acumule tiempos anteriores.
         self.latencias.clear()
         respuesta_json: dict[str, Any] = {}
 
         for intento in range(1, self.intentos + 1):
             url, body = armar_peticion(self.pregunta)
+            # perf_counter ofrece resolución adecuada para medir intervalos cortos.
             inicio = time.perf_counter()
             respuesta_json = enviar_peticion(url, body)
             duracion = time.perf_counter() - inicio
@@ -50,6 +55,7 @@ class Latencia:
     def ejecutar(self) -> float:
         """Mide las solicitudes, muestra el promedio y estima el último costo."""
         respuesta_json = self.medir_solicitudes()
+        # Se devuelve el promedio de todos los intentos y se cobra solo la última respuesta.
         latencia_promedio = sum(self.latencias) / len(self.latencias)
         print(f"Latencia promedio: {latencia_promedio:.2f} segundos")
 

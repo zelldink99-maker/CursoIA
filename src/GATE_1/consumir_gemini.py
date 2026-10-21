@@ -1,5 +1,4 @@
 """Consulta la API de Gemini y valida sus respuestas."""
-#Codigo refactorizado y con excepciones para manejar errores de conexión, HTTP y formato de respuesta.
 
 import os
 import sys
@@ -10,7 +9,7 @@ from dotenv import load_dotenv
 
 
 # Mantiene la configuración independiente del directorio desde el que se ejecute.
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = PROJECT_ROOT / ".env"
 MODEL = "gemini-3.5-flash"
 API_URL = (
@@ -18,12 +17,13 @@ API_URL = (
 )
 REQUEST_TIMEOUT = 30
 
-# Carga el .env del proyecto sin sobrescribir variables ya definidas en el sistema.
+# Carga los valores locales, pero conserva prioridad para variables del sistema.
 load_dotenv(dotenv_path=ENV_PATH)
 
 
 def _obtener_api_key() -> str:
     """Devuelve la clave de API o indica cómo configurar una."""
+    # Rechaza tanto la ausencia de clave como el marcador del archivo de ejemplo.
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key or api_key == "tu_llave_aqui":
         raise RuntimeError(
@@ -34,6 +34,7 @@ def _obtener_api_key() -> str:
 
 def _mensaje_error(respuesta: requests.Response) -> str:
     """Extrae el detalle del error HTTP, usando el cuerpo como alternativa."""
+    # La API suele incluir el motivo dentro de un objeto JSON "error".
     try:
         datos = respuesta.json()
     except ValueError:
@@ -51,6 +52,7 @@ def _mensaje_error(respuesta: requests.Response) -> str:
 
 def _extraer_texto(datos: object) -> str:
     """Valida la estructura JSON de Gemini y concatena las partes de texto."""
+    # Cada nivel se comprueba para convertir respuestas incompletas en errores claros.
     if not isinstance(datos, dict):
         raise RuntimeError("Gemini devolvió una respuesta con un formato inesperado.")
 
@@ -78,6 +80,7 @@ def _extraer_texto(datos: object) -> str:
     if not textos:
         raise RuntimeError("Gemini no devolvió texto en su respuesta.")
 
+    # Una respuesta puede dividirse en partes; se concatenan para devolverla completa.
     return "".join(textos)
 
 
@@ -115,6 +118,7 @@ def obtener_dato_de_prueba(pregunta: str) -> str:
         )
 
     try:
+        # Primero valida que el cuerpo HTTP sea JSON antes de recorrer su contenido.
         datos = respuesta.json()
     except ValueError as error:
         raise RuntimeError(

@@ -2,7 +2,7 @@
 
 ## Modelo elegido
 
-La implementación actual usa **Gemini 3.5 Flash** (`gemini-3.5-flash`) para generar respuestas. Este modelo aparece configurado en `src/consumir_gemini.py`, `src/monolitico_refactorizado_conExcepciones.py` y `src/monolitico.py`.
+La implementación actual usa **Gemini 3.5 Flash** (`gemini-3.5-flash`) para generar respuestas. Este modelo aparece configurado en `src/GATE_1/consumir_gemini.py` y `src/GATE_1/monolitico.py`.
 
 En la comparación registrada abajo, el nombre **Modelo A** corresponde al modelo elegido para la aplicación. El código confirma que el modelo implementado es `gemini-3.5-flash`; no identifica el modelo alternativo como Modelo B.
 
@@ -18,11 +18,11 @@ El flujo robusto de consulta es:
 4. La respuesta HTTP se valida. Los errores de conexión, tiempo de espera, estado HTTP, JSON inválido o formato inesperado se convierten en mensajes explícitos.
 5. `_extraer_texto` obtiene y concatena las partes de texto del primer candidato, y devuelve la respuesta.
 
-Este flujo corresponde a `src/consumir_gemini.py` y `src/monolitico_refactorizado_conExcepciones.py`. `src/monolitico.py` es una versión más sencilla: construye la URL con la clave y no incluye esas validaciones ni manejo de errores.
+Este flujo corresponde a `src/GATE_1/consumir_gemini.py`. `src/GATE_1/monolitico.py` es una versión más sencilla: construye la URL con la clave y no incluye esas validaciones ni manejo de errores.
 
 ## Medición de latencia y estimación de costo
 
-La clase `Latencia`, en `src/latencia.py`, realiza cuatro solicitudes de prueba por defecto usando las funciones de `src/monolitico.py`, imprime el tiempo de cada solicitud y su promedio. Después estima el costo de la última respuesta mediante `calcular_costo`, de `src/costo.py`, usando los contadores de tokens de `usageMetadata`. La prueba se ejecuta al lanzar el módulo o llamar `Latencia.ejecutar()`; importarlo no realiza solicitudes.
+La clase `Latencia`, en `src/GATE_1/latencia.py`, realiza cuatro solicitudes de prueba por defecto usando las funciones de `src/GATE_1/monolitico.py`, imprime el tiempo de cada solicitud y su promedio. Después estima el costo de la última respuesta mediante `calcular_costo`, de `src/GATE_1/costo.py`, usando los contadores de tokens de `usageMetadata`. La prueba se ejecuta al lanzar el módulo o llamar `Latencia.ejecutar()`; importarlo no realiza solicitudes.
 
 Las tarifas configuradas en el script son `0,00000010 USD` por token de entrada y `0,00000030 USD` por token de salida (equivalentes a `0,0001 USD` y `0,0003 USD` por cada 1.000 tokens, respectivamente). Son valores escritos en el código, no una consulta dinámica de precios; deben actualizarse si cambia la tarifa del proveedor.
 

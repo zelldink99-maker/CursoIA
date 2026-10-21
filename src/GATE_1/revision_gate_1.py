@@ -1,0 +1,574 @@
+"""Revisa los módulos de GATE_1 y genera un reporte local o una prueba API opcional."""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+from contextlib import redirect_stdout
+from io import StringIO
+from pathlib import Path
+from typing import Optional
+from unittest.mock import Mock, patch
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+GATE_DIR = Path(__file__).resolve().parent
+MODEL = "gemini-3.5-flash"
+# Permite importar el paquete cuando el verificador se inicia desde cualquier carpeta.
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# El propósito y el resultado esperado se imprimen antes de ejecutar las comprobaciones.
+MODULES = {
+    "api_test.py": (
+        "Hace una petición sencilla a Gemini para comprobar el endpoint.",
+        "Con una clave válida, Gemini devuelve una respuesta HTTP exitosa con texto.",
+    ),
+    "consumir_gemini.py": (
+        "Cliente robusto: valida la pregunta, configuración, HTTP y respuesta.",
+        "Una pregunta válida devuelve texto; errores de API o configuración son explícitos.",
+    ),
+    "costo.py": (
+        "Calcula el costo estimado desde los tokens de entrada/salida y sus tarifas.",
+        "Con los tokens de ejemplo del módulo, el costo calculado coincide con la fórmula.",
+    ),
+    "latencia.py": (
+        "Mide varias solicitudes y calcula el promedio de latencia y costo final.",
+        "Con dos respuestas simuladas, registra dos tiempos y devuelve un promedio no negativo.",
+    ),
+    "main.py": (
+        "Ejecuta la demostración de aritmética y una consulta a Gemini.",
+        "La suma de ejemplo es 8 y, con API disponible, la consulta devuelve texto.",
+    ),
+    "module_test.py": (
+        "Prueba el envío de una petición usando las funciones de peticiones.py.",
+        "Con una clave válida, la API devuelve una respuesta; requiere conexión real.",
+    ),
+    "monolitico.py": (
+        "Prepara y envía una solicitud a Gemini en una implementación simple.",
+        "La petición incluye autenticación segura y devuelve el JSON de Gemini.",
+    ),
+    "peticiones.py": (
+        "Construye el cuerpo y encabezados HTTP y envía una petición POST.",
+        "El cuerpo conserva la pregunta, la clave va en un encabezado y se recibe texto.",
+    ),
+}
+
+
+class Reporte:
+    """Acumula comprobaciones y presenta estados legibles sin revelar secretos."""
+
+    def __init__(self) -> None:
+        self.resultados: list[tuple[str, str, Optional[bool], str]] = []
+
+    def agregar(
+        self, grupo: str, nombre: str, correcto: Optional[bool], detalle: str
+    ) -> None:
+        """Registra una comprobación y muestra su estado en el reporte."""
+        self.resultados.append((grupo, nombre, correcto, detalle))
+        estado = (
+            "BIEN"
+            if correcto is True
+            else "MAL"
+            if correcto is False
+            else "OMITIDO"
+        )
+        print(f"  [{estado}] {nombre}: {detalle}")
+
+    @property
+    def fallo(self) -> bool:
+        """Indica si alguna comprobación terminó con error."""
+        return any(correcto is False for _, _, correcto, _ in self.resultados)
+
+    def estado_grupo(self, grupo: str) -> Optional[bool]:
+        """Resume un grupo; None significa que quedó pendiente o no se ejecutó."""
+        estados = [
+            correcto
+            for nombre_grupo, _, correcto, _ in self.resultados
+            if nombre_grupo == grupo
+        ]
+        if any(estado is False for estado in estados):
+            return False
+        if estados and all(estado is True for estado in estados):
+            return True
+        return None
+
+
+def _importar_modulos() -> dict[str, object]:
+    """Importa módulos sin lanzar los scripts que hacen llamadas al importarse."""
+    from src.GATE_1 import (
+        api_test,
+        consumir_gemini,
+        costo,
+        latencia,
+        main,
+        module_test,
+        monolitico,
+        peticiones,
+    )
+
+    return {
+        "api_test": api_test,
+        "consumir_gemini": consumir_gemini,
+        "costo": costo,
+        "latencia": latencia,
+        "main": main,
+        "module_test": module_test,
+        "monolitico": monolitico,
+        "peticiones": peticiones,
+    }
+
+
+def _revisar_sintaxis(reporte: Reporte) -> None:
+    """Analiza los módulos del Gate 1 sin ejecutarlos."""
+    archivos = [(nombre, GATE_DIR / nombre) for nombre in MODULES]
+    archivos.append(("revision_gate_1.py", Path(__file__)))
+    for nombre, ruta in archivos:
+        try:
+            ast.parse(ruta.read_text(encoding="utf-8-sig"), filename=str(ruta))
+        except (OSError, SyntaxError, UnicodeError) as error:
+            reporte.agregar(nombre, "Sintaxis", False, str(error))
+        else:
+            reporte.agregar(nombre, "Sintaxis", True, "archivo Python válido")
+
+
+def _revisar_dependencias(reporte: Reporte) -> None:
+    """Comprueba las dependencias declaradas y la versión mínima de Python."""
+    requirements = PROJECT_ROOT / "requirements.txt"
+    if not requirements.is_file():
+        reporte.agregar("Entorno reproducible", "requirements.txt", False, "no existe")
+        return
+
+    declaradas: set[str] = set()
+    for linea in requirements.read_text(encoding="utf-8-sig").splitlines():
+        entrada = linea.strip()
+        if entrada and not entrada.startswith("#"):
+            declaradas.add(re.split(r"[<>=!~]", entrada, maxsplit=1)[0].lower())
+
+    paquetes = {"requests": "requests", "python-dotenv": "dotenv"}
+    faltantes = [
+        distribucion
+        for distribucion, modulo in paquetes.items()
+        if distribucion not in declaradas or importlib.util.find_spec(modulo) is None
+    ]
+    if faltantes:
+        reporte.agregar(
+            "Entorno reproducible",
+            "Dependencias",
+            False,
+            "faltan en requirements.txt o no están instaladas: " + ", ".join(faltantes),
+        )
+    else:
+        reporte.agregar(
+            "Entorno reproducible",
+            "Dependencias",
+            True,
+            "requests y python-dotenv están declaradas e instaladas",
+        )
+
+    version_ok = sys.version_info >= (3, 9)
+    reporte.agregar(
+        "Entorno reproducible",
+        "Versión de Python",
+        version_ok,
+        f"{sys.version_info.major}.{sys.version_info.minor}"
+        + (" (mínimo: 3.9)" if version_ok else " (se requiere 3.9 o superior)"),
+    )
+
+
+def _revisar_credenciales(reporte: Reporte) -> str:
+    """Revisa la configuración y evita mostrar el valor de la clave API."""
+    if importlib.util.find_spec("dotenv") is not None:
+        from dotenv import load_dotenv
+
+        load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
+    archivo_ignore = PROJECT_ROOT / ".gitignore"
+    # git check-ignore confirma la regla efectiva, no solo el texto del .gitignore.
+    try:
+        ignorado = subprocess.run(
+            ["git", "check-ignore", "--no-index", "--quiet", ".env"],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        ).returncode == 0
+    except OSError:
+        ignorado = False
+    reporte.agregar(
+        "Credenciales no expuestas",
+        ".env excluido por Git",
+        ignorado and archivo_ignore.is_file(),
+        "Git ignora .env" if ignorado else ".env no está confirmado como ignorado por Git",
+    )
+
+    # Busca patrones de claves incrustadas en los scripts de este Gate.
+    clave_en_codigo = False
+    patron_clave_google = re.compile(r"AIza[0-9A-Za-z_-]{20,}")
+    for ruta in GATE_DIR.glob("*.py"):
+        try:
+            clave_en_codigo |= bool(
+                patron_clave_google.search(ruta.read_text(encoding="utf-8-sig"))
+            )
+        except (OSError, UnicodeError):
+            clave_en_codigo = True
+    reporte.agregar(
+        "Credenciales no expuestas",
+        "Sin claves literales en scripts",
+        not clave_en_codigo,
+        "no se encontraron claves incrustadas"
+        if not clave_en_codigo
+        else "se encontró una posible clave API en un archivo .py",
+    )
+
+    valor = os.getenv("GEMINI_API_KEY", "").strip()
+    if not valor:
+        reporte.agregar(
+            "API funciona",
+            "Clave configurada",
+            False,
+            "falta GEMINI_API_KEY en el entorno o en el archivo .env",
+        )
+        return ""
+    if valor == "tu_llave_aqui":
+        reporte.agregar(
+            "API funciona",
+            "Clave configurada",
+            False,
+            "GEMINI_API_KEY conserva el valor de ejemplo",
+        )
+        return ""
+
+    reporte.agregar(
+        "API funciona",
+        "Clave configurada",
+        True,
+        "GEMINI_API_KEY está disponible; el valor no se muestra",
+    )
+    return valor
+
+
+def _revisar_peticiones(reporte: Reporte, modulos: dict[str, object]) -> None:
+    """Verifica la preparación y el envío HTTP reemplazando la red por un mock."""
+    peticiones = modulos["peticiones"]
+    prompt = "pregunta de prueba"
+    cuerpo = json.loads(peticiones.create_payload(prompt))
+    headers = peticiones.create_headers("clave-de-prueba")
+    llamada = Mock()
+    llamada.text = '{"respuesta":"simulada"}'
+    with patch.object(peticiones.requests, "request", return_value=llamada) as request:
+        resultado = peticiones.make_request(
+            "https://example.invalid/generateContent",
+            headers,
+            peticiones.create_payload(prompt),
+        )
+    cuerpo_ok = cuerpo == {"contents": [{"parts": [{"text": prompt}]}]}
+    request_ok = (
+        resultado == llamada.text
+        and request.call_args.kwargs["headers"]["x-goog-api-key"] == "clave-de-prueba"
+        and request.call_args.kwargs["data"] == peticiones.create_payload(prompt)
+    )
+    correcto = cuerpo_ok and headers.get("x-goog-api-key") == "clave-de-prueba" and request_ok
+    reporte.agregar(
+        "peticiones.py",
+        "Cuerpo, encabezado y envío simulados",
+        correcto,
+        "la pregunta se conserva y la solicitud usa autenticación por encabezado"
+        if correcto
+        else "falló la comprobación del cuerpo, encabezado o envío",
+    )
+
+
+def _revisar_costo(reporte: Reporte, modulos: dict[str, object]) -> None:
+    """Compara el cálculo del módulo con un resultado conocido."""
+    datos = {
+        "usageMetadata": {
+            "promptTokenCount": 850,
+            "candidatesTokenCount": 320,
+            "totalTokenCount": 1170,
+        }
+    }
+    esperado = 850 * 0.00000010 + 320 * 0.00000040
+    obtenido = modulos["costo"].calcular_costo(datos, 0.00000010, 0.00000040)
+    reporte.agregar(
+        "costo.py",
+        "Cálculo de ejemplo",
+        abs(obtenido - esperado) < 1e-12,
+        f"esperado {esperado:.8f}; obtenido {obtenido:.8f}",
+    )
+
+
+def _revisar_cliente(reporte: Reporte, modulos: dict[str, object]) -> None:
+    """Comprueba extracción de texto y rechazo de preguntas vacías localmente."""
+    cliente = modulos["consumir_gemini"]
+    texto = cliente._extraer_texto(
+        {"candidates": [{"content": {"parts": [{"text": "respuesta"}, {"text": " lista"}]}}]}
+    )
+    formato_ok = texto == "respuesta lista"
+    try:
+        cliente.obtener_dato_de_prueba("   ")
+    except ValueError:
+        pregunta_vacia_rechazada = True
+    else:
+        pregunta_vacia_rechazada = False
+    correcto = formato_ok and pregunta_vacia_rechazada
+    reporte.agregar(
+        "consumir_gemini.py",
+        "Validación local de respuesta",
+        correcto,
+        "concatena el texto y rechaza preguntas vacías"
+        if correcto
+        else "no coincide el texto extraído o no rechaza pregunta vacía",
+    )
+
+
+def _revisar_monolitico(reporte: Reporte, modulos: dict[str, object]) -> None:
+    """Comprueba el cliente simple con una respuesta HTTP simulada."""
+    monolitico = modulos["monolitico"]
+    clave = "clave-local-de-prueba"
+    with patch.dict(os.environ, {"GEMINI_API_KEY": clave}):
+        url, body = monolitico.armar_peticion("pregunta")
+        respuesta = Mock()
+        respuesta.json.return_value = {"candidates": []}
+        with patch.object(
+            monolitico.requests, "post", return_value=respuesta
+        ) as post:
+            resultado = monolitico.enviar_peticion(url, body)
+    llamada = post.call_args
+    correcto = (
+        clave not in url
+        and llamada.kwargs["headers"].get("x-goog-api-key") == clave
+        and llamada.kwargs["timeout"] > 0
+        and resultado == {"candidates": []}
+    )
+    reporte.agregar(
+        "monolitico.py",
+        "Autenticación segura y respuesta simulada",
+        correcto,
+        "la clave no aparece en la URL y se envía en el encabezado"
+        if correcto
+        else "la clave podría exponerse o la petición no cumplió lo esperado",
+    )
+
+
+def _revisar_latencia(reporte: Reporte, modulos: dict[str, object]) -> None:
+    """Comprueba los intentos de latencia con respuestas simuladas."""
+    latencia = modulos["latencia"]
+    datos = {
+        "usageMetadata": {
+            "promptTokenCount": 2,
+            "candidatesTokenCount": 3,
+            "totalTokenCount": 5,
+        }
+    }
+    with patch.object(latencia, "enviar_peticion", return_value=datos) as enviar:
+        with redirect_stdout(StringIO()):
+            promedio = latencia.Latencia(intentos=2).ejecutar()
+    correcto = enviar.call_count == 2 and promedio >= 0
+    reporte.agregar(
+        "latencia.py",
+        "Dos solicitudes simuladas",
+        correcto,
+        f"se hicieron {enviar.call_count} envíos; promedio {promedio:.4f} s",
+    )
+
+
+def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
+    """Verifica los scripts de ejemplo sin enviar solicitudes a la red."""
+    clave = "clave-local-de-prueba"
+
+    api_test = modulos["api_test"]
+    respuesta = Mock()
+    respuesta.text = '{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}'
+    with patch.dict(os.environ, {"GEMINI_API_KEY": clave}):
+        with patch.object(api_test.requests, "post", return_value=respuesta) as post:
+            with redirect_stdout(StringIO()) as salida:
+                codigo_api = api_test.main()
+    api_ok = (
+        codigo_api == 0
+        and "La API respondió correctamente." in salida.getvalue()
+        and post.call_args.kwargs["headers"]["x-goog-api-key"] == clave
+    )
+    reporte.agregar(
+        "api_test.py",
+        "Resultado HTTP simulado",
+        api_ok,
+        "imprime éxito solo después de una respuesta HTTP correcta"
+        if api_ok
+        else "no informó correctamente la respuesta simulada",
+    )
+
+    modulo_test = modulos["module_test"]
+    with patch.dict(os.environ, {"GEMINI_API_KEY": clave}):
+        with patch.object(
+            modulo_test, "make_request", return_value="respuesta simulada"
+        ) as request:
+            with redirect_stdout(StringIO()) as salida:
+                codigo_modulo = modulo_test.main()
+    modulo_ok = (
+        codigo_modulo == 0
+        and "respuesta simulada" in salida.getvalue()
+        and request.call_args.kwargs["headers"]["x-goog-api-key"] == clave
+    )
+    reporte.agregar(
+        "module_test.py",
+        "Envío de módulo simulado",
+        modulo_ok,
+        "envía la clave en el encabezado y muestra la respuesta"
+        if modulo_ok
+        else "falló la llamada simulada del módulo",
+    )
+
+    modulo_main = modulos["main"]
+    with patch.object(
+        modulo_main, "obtener_dato_de_prueba", return_value="respuesta simulada"
+    ):
+        with redirect_stdout(StringIO()) as salida:
+            codigo_main = modulo_main.main()
+    main_ok = (
+        codigo_main == 0
+        and "5 + 3 = 8" in salida.getvalue()
+        and "respuesta simulada" in salida.getvalue()
+    )
+    reporte.agregar(
+        "main.py",
+        "Demostración simulada",
+        main_ok,
+        "suma 5 + 3 y muestra la respuesta de Gemini"
+        if main_ok
+        else "la suma o el resultado de demostración no coincide",
+    )
+
+
+def _probar_api(reporte: Reporte, modulos: dict[str, object], clave: str) -> None:
+    """Hace una petición real para comprobar disponibilidad y redacta la clave."""
+    if not clave:
+        reporte.agregar(
+            "API funciona",
+            "Prueba real de Gemini",
+            False,
+            "no se puede probar sin GEMINI_API_KEY válida",
+        )
+        return
+    try:
+        texto = modulos["consumir_gemini"].obtener_dato_de_prueba(
+            "Responde únicamente: conexión correcta"
+        )
+    except (RuntimeError, ValueError) as error:
+        detalle = str(error).replace(clave, "[REDACTADA]")
+        reporte.agregar("API funciona", "Prueba real de Gemini", False, detalle)
+    else:
+        correcto = bool(texto.strip())
+        reporte.agregar(
+            "API funciona",
+            "Prueba real de Gemini",
+            correcto,
+            f"se recibió una respuesta de {len(texto)} caracteres"
+            if correcto
+            else "Gemini respondió sin texto",
+        )
+
+
+def main() -> int:
+    """Ejecuta las comprobaciones y devuelve un código distinto de cero si fallan."""
+    for salida in (sys.stdout, sys.stderr):
+        if hasattr(salida, "reconfigure"):
+            salida.reconfigure(encoding="utf-8")
+
+    # La prueba real se puede omitir para ejecutar únicamente verificaciones locales.
+    parser = argparse.ArgumentParser(
+        description=(
+            "Describe y verifica los módulos de GATE_1. "
+            "Por defecto comprueba Gemini con una petición real."
+        )
+    )
+    parser.add_argument(
+        "--omitir-api",
+        action="store_true",
+        help="omite la petición real a Gemini y deja ese check como pendiente",
+    )
+    argumentos = parser.parse_args()
+
+    print("REVISIÓN DE GATE_1")
+    print(f"Proyecto: {PROJECT_ROOT}")
+    print("\nMÓDULOS Y RESULTADO ESPERADO")
+    for nombre, (proposito, esperado) in MODULES.items():
+        print(f"\n- {nombre}: {proposito}")
+        print(f"  Esperado: {esperado}")
+
+    # Separa los chequeos por categoría para que el resultado sea fácil de revisar.
+    reporte = Reporte()
+    print("\n1. CÓDIGO EJECUTABLE")
+    _revisar_sintaxis(reporte)
+    try:
+        modulos = _importar_modulos()
+    except (ImportError, ModuleNotFoundError) as error:
+        reporte.agregar(
+            "Código ejecutable", "Importaciones del paquete", False, str(error)
+        )
+        modulos = {}
+    else:
+        reporte.agregar(
+            "Código ejecutable",
+            "Importaciones del paquete",
+            True,
+            "los módulos de lógica se importan desde la raíz del proyecto",
+        )
+
+    print("\n2. ENTORNO REPRODUCIBLE")
+    _revisar_dependencias(reporte)
+
+    print("\n3. CREDENCIALES NO EXPUESTAS")
+    clave = _revisar_credenciales(reporte)
+
+    if modulos:
+        print("\n4. PRUEBAS LOCALES (sin llamadas de red)")
+        _revisar_peticiones(reporte, modulos)
+        _revisar_costo(reporte, modulos)
+        _revisar_cliente(reporte, modulos)
+        _revisar_monolitico(reporte, modulos)
+        _revisar_latencia(reporte, modulos)
+        _revisar_scripts(reporte, modulos)
+
+    print("\n5. DISPONIBILIDAD DE LA API")
+    if not argumentos.omitir_api:
+        if modulos:
+            _probar_api(reporte, modulos, clave)
+        else:
+            reporte.agregar(
+                "API funciona", "Prueba real de Gemini", False, "no se importó el cliente"
+            )
+    else:
+        reporte.agregar(
+            "API funciona",
+            "Prueba real de Gemini",
+            None,
+            "omitida por --omitir-api; vuelve a ejecutar sin esa opción para probarla",
+        )
+
+    print("\nCHECKLIST DEL GATE 1")
+    for grupo in (
+        "API funciona",
+        "Entorno reproducible",
+        "Credenciales no expuestas",
+        "Código ejecutable",
+    ):
+        estado = reporte.estado_grupo(grupo)
+        etiqueta = "BIEN" if estado is True else "MAL" if estado is False else "PENDIENTE"
+        print(f"- [{etiqueta}] {grupo}")
+
+    print("\nLas claves API nunca se imprimen.")
+    if not argumentos.omitir_api:
+        print("La prueba de disponibilidad envió una petición real a Gemini.")
+    else:
+        print("Las pruebas ejecutadas se hicieron sin llamadas de red.")
+    return 1 if reporte.fallo else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
