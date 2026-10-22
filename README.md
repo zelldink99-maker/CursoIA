@@ -1,5 +1,9 @@
 # Plantilla de repositorio base — Especialización en Desarrollo con IA Generativa (Accenture)
 
+<p align="center">
+  <img src="docs/IA.jpg" alt="Inteligencia artificial aplicada al desarrollo" width="800">
+</p>
+
 Esta es la estructura base del proyecto para la Especialización en Desarrollo
 con IA Generativa. Se irá ampliando bloque a bloque hasta llegar a la
 aplicación completa del Gate 3. En este repositorio se practica el envío de
@@ -108,7 +112,30 @@ dependencias, imports y credenciales, y ejecuta pruebas locales simuladas.
 También comprueba por defecto la disponibilidad de Gemini con una petición
 real. Configura `GEMINI_API_KEY` en `.env` antes de ejecutarlo. La clave no se
 imprime; la prueba real puede generar un costo mínimo de API.
-Para actuar ante saturación, cuota o límites de tokens, consulta la
+Si Gemini no responde, revisa primero el estado HTTP antes de cambiar el
+modelo:
+
+- **503 o servicio ocupado:** suele ser saturación temporal. Espera unos
+  minutos y vuelve a probar; si persiste, prueba un modelo alternativo.
+- **429 o cuota agotada:** revisa los límites y la cuota del proyecto en Google
+  AI Studio; cambiar de modelo no garantiza resolverlo.
+- **400, modelo no disponible o error de autenticación:** comprueba el nombre
+  del modelo, la clave y que el modelo esté habilitado para tu proyecto.
+
+Este proyecto usa actualmente `gemini-3.8-flash`; no usa `gemini-3.5-flash`.
+Como alternativas oficiales puedes evaluar `gemini-3.6-flash` para tareas
+generales, o `gemini-3.5-flash-lite` y `gemini-3.1-flash-lite` para cargas de
+mayor volumen. La disponibilidad, capacidades y precios dependen del modelo,
+la cuenta y la fecha; confirma los datos vigentes en la
+[lista oficial de modelos](https://ai.google.dev/gemini-api/docs/models) y la
+[tabla oficial de precios](https://ai.google.dev/gemini-api/docs/pricing).
+
+El proyecto no cambia de modelo automáticamente. Si decides cambiarlo, actualiza
+el identificador en `monolitico.py`, `consumir_gemini.py`, `api_test.py` y
+`module_test.py`; actualiza también el modelo y los precios de `costo.py` y las
+comprobaciones de `revision_gate_1.py`. Ejecuta primero las pruebas locales con
+`--omitir-api` y luego verifica el modelo elegido con una petición real. Para
+más detalle sobre cuota, límites de tokens y cambio manual, consulta la
 [guía de contingencia y cambio de modelo](docs/decision-arquitectura.md#contingencia-disponibilidad-y-límites-de-tokens).
 
 Para omitir la prueba de red y dejar el check de disponibilidad pendiente:
