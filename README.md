@@ -1,5 +1,9 @@
 # Plantilla de repositorio base — Especialización en Desarrollo con IA Generativa (Accenture)
 
+<p align="center">
+  <img src="docs/IA.jpg" alt="Inteligencia artificial aplicada al desarrollo" width="800">
+</p>
+
 Esta es la estructura base del proyecto para la Especialización en Desarrollo
 con IA Generativa. Se irá ampliando bloque a bloque hasta llegar a la
 aplicación completa del Gate 3. En este repositorio se practica el envío de
