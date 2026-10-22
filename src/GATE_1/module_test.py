@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 
 # Importa las funciones que preparan la petición y la que la envía a Gemini.
-from .peticiones import create_headers, create_payload, make_request
+from peticiones import create_headers, create_payload, make_request
 
 # Obtiene la ruta raíz del proyecto y apunta al archivo .env.
 env_path = Path(__file__).resolve().parents[2] / ".env"

@@ -15,11 +15,7 @@ def multiplicar(a, b):
 
 # Divide a entre b.
 def dividir(a, b):
-    # Esta condición está invertida: con b == 0, la operación provoca
-    # ZeroDivisionError en lugar de devolver el mensaje de error.
     if b == 0:
-        return a/b
-    else:
-        # Para un divisor válido, esta rama devuelve el mensaje de error.
-        return "Error: Division por cero no permitida"
+        raise ZeroDivisionError("No se puede dividir por cero.")
+    return a / b
     

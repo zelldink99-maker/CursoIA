@@ -1,16 +1,24 @@
 """Mide la latencia de solicitudes a Gemini y estima el costo de la última."""
 
+import math
+import sys
 import time
+from numbers import Real
 from typing import Any
 
 # Estos módulos se importan desde el directorio GATE_1 al ejecutar este script.
-from costo import calcular_costo
-from monolitico import armar_peticion, enviar_peticion
+from costo import (
+    MODELO_TARIFADO,
+    PRECIO_ENTRADA_POR_TOKEN,
+    PRECIO_SALIDA_POR_TOKEN,
+    calcular_costo,
+)
+from monolitico import GeminiError, armar_peticion, enviar_peticion
 
-# Tarifas aproximadas expresadas en dólares por token; actualizarlas si cambian.
-PRECIO_ENTRADA = 0.00000010
-PRECIO_SALIDA = 0.00000030
+PRECIO_ENTRADA = PRECIO_ENTRADA_POR_TOKEN
+PRECIO_SALIDA = PRECIO_SALIDA_POR_TOKEN
 PREGUNTA_PREDETERMINADA = "Confirma en una frase corta que esta conexión funciona"
+INSTRUCCION_SISTEMA = "Responde únicamente con una frase breve."
 
 
 class Latencia:
@@ -24,10 +32,21 @@ class Latencia:
         precio_salida: float = PRECIO_SALIDA,
     ) -> None:
         """Configura la pregunta, el número de solicitudes y sus tarifas."""
-        if not pregunta.strip():
+        if not isinstance(pregunta, str) or not pregunta.strip():
             raise ValueError("La pregunta no puede estar vacía.")
-        if intentos <= 0:
+        if not isinstance(intentos, int) or isinstance(intentos, bool) or intentos <= 0:
             raise ValueError("El número de intentos debe ser mayor que cero.")
+        for nombre, precio in (
+            ("precio_entrada", precio_entrada),
+            ("precio_salida", precio_salida),
+        ):
+            if (
+                not isinstance(precio, Real)
+                or isinstance(precio, bool)
+                or not math.isfinite(precio)
+                or precio < 0
+            ):
+                raise ValueError(f"{nombre} debe ser un número finito no negativo.")
 
         self.pregunta = pregunta
         self.intentos = intentos
@@ -42,7 +61,7 @@ class Latencia:
         respuesta_json: dict[str, Any] = {}
 
         for intento in range(1, self.intentos + 1):
-            url, body = armar_peticion(self.pregunta)
+            url, body = armar_peticion(self.pregunta, INSTRUCCION_SISTEMA)
             # perf_counter ofrece resolución adecuada para medir intervalos cortos.
             inicio = time.perf_counter()
             respuesta_json = enviar_peticion(url, body)
@@ -64,9 +83,13 @@ class Latencia:
             self.precio_entrada,
             self.precio_salida,
         )
-        print(f"Costo de la última petición: {costo}")
+        print(f"Costo estimado de la última petición ({MODELO_TARIFADO}): ${costo:.8f} USD")
         return latencia_promedio
 
 
 if __name__ == "__main__":
-    Latencia().ejecutar()
+    try:
+        Latencia().ejecutar()
+    except (GeminiError, ValueError) as error:
+        print(f"Error al medir la latencia: {error}", file=sys.stderr)
+        raise SystemExit(1) from error

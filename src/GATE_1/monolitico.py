@@ -43,11 +43,21 @@ class GeminiResponseError(GeminiError):
     """La respuesta de Gemini no tiene el formato esperado."""
 
 
-def armar_peticion(pregunta):
-    """Construye el endpoint y el cuerpo de una consulta simple."""
+def armar_peticion(
+    pregunta_usuario: str, system_instruction: str
+) -> tuple[str, dict[str, Any]]:
+    """Construye el endpoint y el cuerpo de una consulta con instrucción del sistema."""
+    if not isinstance(pregunta_usuario, str) or not pregunta_usuario.strip():
+        raise ValueError("La pregunta debe ser un texto no vacío.")
+    if not isinstance(system_instruction, str) or not system_instruction.strip():
+        raise ValueError("La instrucción del sistema debe ser un texto no vacío.")
+
     modelo = "gemini-3.5-flash"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-    body = {"contents": [{"parts": [{"text": pregunta}]}]}
+    body = {
+        "systemInstruction": {"parts": [{"text": system_instruction}]},
+        "contents": [{"parts": [{"text": pregunta_usuario}]}],
+    }
     return url, body
 
 
@@ -156,27 +166,65 @@ def extraer_texto(datos: Any) -> str:
     return "".join(textos)
 
 
+def extraer_metadatos_uso(datos: Any) -> dict[str, int]:
+    """Devuelve los contadores de tokens de uso incluidos en la respuesta."""
+    if not isinstance(datos, dict):
+        raise GeminiResponseError(
+            "Gemini devolvió una respuesta con un formato inesperado."
+        )
+
+    metadatos = datos.get("usageMetadata")
+    if not isinstance(metadatos, dict):
+        raise GeminiResponseError(
+            "Gemini no devolvió metadatos de uso de tokens."
+        )
+
+    campos = ("promptTokenCount", "candidatesTokenCount", "totalTokenCount")
+    if any(
+        not isinstance(metadatos.get(campo), int)
+        or isinstance(metadatos.get(campo), bool)
+        or metadatos[campo] < 0
+        for campo in campos
+    ):
+        raise GeminiResponseError(
+            "Gemini devolvió metadatos de uso de tokens incompletos o inválidos."
+        )
+
+    return {campo: metadatos[campo] for campo in campos}
+
+
 def obtener_dato_de_prueba(pregunta: str) -> str:
     """Valida una pregunta y devuelve la respuesta de texto de Gemini."""
     if not isinstance(pregunta, str) or not pregunta.strip():
         raise ValueError("La pregunta debe ser un texto no vacío.")
 
-    url, body = armar_peticion(pregunta)
+    system_instruction = (
+        "Eres un asistente técnico. Responde siempre en un máximo de 3 oraciones."
+    )
+    url, body = armar_peticion(pregunta, system_instruction)
     datos = enviar_peticion(url, body)
     return extraer_texto(datos)
 
 
 def main() -> int:
     """Ejecuta una consulta de ejemplo y devuelve un código de salida."""
+    pregunta = "Explica qué es una API en términos simples."
+    system_instruction = (
+        "Eres un asistente técnico. Responde siempre en un máximo de 3 oraciones."
+    )
+
     try:
-        print(
-            obtener_dato_de_prueba(
-                "Confirma en una frase corta que esta conexión funciona"
-            )
-        )
+        url, body = armar_peticion(pregunta, system_instruction)
+        respuesta_json = enviar_peticion(url, body)
+        texto = extraer_texto(respuesta_json)
+        metadata = extraer_metadatos_uso(respuesta_json)
     except (GeminiError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
+    print(texto)
+    print("Tokens de entrada:", metadata["promptTokenCount"])
+    print("Tokens de salida:", metadata["candidatesTokenCount"])
+    print("Total:", metadata["totalTokenCount"])
     return 0
 
 
