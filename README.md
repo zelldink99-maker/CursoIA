@@ -8,40 +8,70 @@ de los tokens de una respuesta.
 
 ## Cómo empezar
 
-Estos pasos se completan de forma progresiva durante la Unidad U1.2:
+Después de clonar el repositorio o descomprimir el proyecto, abre una terminal
+en la carpeta raíz. Usa Python 3.10 o superior y crea un entorno virtual para
+instalar las dependencias sin modificar la instalación global de Python.
 
-1. Descarga el archivo comprimido del proyecto desde la plataforma y
-   descomprímelo. Inicializa el control de versiones en esa carpeta y, si aún
-   no lo hiciste, registra un commit inicial con la estructura base.
-2. Crea y activa un entorno virtual de Python:
+### Linux
 
-   ```powershell
-   python -m venv .venv
-   .venv\Scripts\Activate.ps1
-   ```
+En Debian o Ubuntu, si la creación del entorno virtual falla porque no está
+instalado el módulo `venv`, instálalo con `sudo apt install python3-venv`.
+Luego ejecuta:
 
-3. Instala las dependencias del proyecto:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+```
 
-   ```powershell
-   python -m pip install -r requirements.txt
-   ```
+En otras distribuciones, instala el paquete de `venv` correspondiente a tu
+versión de Python si fuera necesario.
 
-   Las dependencias directas están registradas en `requirements.txt`.
-4. Copia `.env.example` a un archivo llamado `.env` y configura
-   `GEMINI_API_KEY` con tu clave real de API. No compartas ni subas `.env`;
-   este archivo está excluido por `.gitignore`.
+### macOS
+
+Comprueba que Python 3 esté disponible con `python3 --version`. Si no lo está,
+instálalo desde [python.org](https://www.python.org/downloads/macos/) o con
+Homebrew (`brew install python`). Después ejecuta:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+```
+
+### Windows (PowerShell)
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+En todos los sistemas, edita `.env` y reemplaza `tu_llave_aqui` por tu clave
+real de Gemini. No compartas ni subas ese archivo: `.gitignore` lo excluye.
+Cuando termines de trabajar, puedes salir del entorno virtual con `deactivate`.
+
+> **Importante:** no instales paquetes con `pip install dotenv` ni directamente
+> en el Python del sistema. Este proyecto necesita `python-dotenv` (declarado
+> en `requirements.txt`), y la instalación debe hacerse con el entorno virtual
+> activado mediante `python -m pip install -r requirements.txt`. Esto también
+> evita el error `externally-managed-environment` de distribuciones Linux que
+> aplican PEP 668.
 
 ## Requisitos
 
-- Python 3.9 o superior.
+- Python 3.10 o superior.
 - Una clave de API de Gemini.
 
 ## Medir latencia y costo
 
 Desde la raíz del repositorio ejecuta:
 
-```powershell
-python src\GATE_1\latencia.py
+```console
+python src/GATE_1/latencia.py
 ```
 
 La clase `Latencia`, definida en `src/GATE_1/latencia.py`, realiza cuatro
@@ -56,7 +86,7 @@ hermanos no están configurados para la ejecución como módulo de paquete.
 La respuesta JSON de Gemini se conserva completa al volver de
 `enviar_peticion`; además del contenido generado puede incluir `usageMetadata`
 con los tokens de entrada, salida y el total. Al ejecutar
-`python src\GATE_1\monolitico.py`, el ejemplo imprime la respuesta y esos tres
+`python src/GATE_1/monolitico.py`, el ejemplo imprime la respuesta y esos tres
 contadores. El programa informa un error explícito si la API no incluye
 metadatos de tokens válidos.
 
@@ -68,8 +98,8 @@ están documentadas en [la decisión de arquitectura](docs/decision-arquitectura
 
 Desde la raíz del repositorio ejecuta el verificador:
 
-```powershell
-python src\GATE_1\revision_gate_1.py
+```console
+python src/GATE_1/revision_gate_1.py
 ```
 
 Describe los módulos `api_test`, `consumir_gemini`, `costo`, `latencia`,
@@ -83,8 +113,8 @@ Para actuar ante saturación, cuota o límites de tokens, consulta la
 
 Para omitir la prueba de red y dejar el check de disponibilidad pendiente:
 
-```powershell
-python src\GATE_1\revision_gate_1.py --omitir-api
+```console
+python src/GATE_1/revision_gate_1.py --omitir-api
 ```
 
 ### Manejo de errores y excepciones
@@ -111,17 +141,18 @@ saludo, por lo que no requieren manejo adicional de errores de ejecución.
 
 ## Banco de prompts estructurados
 
-El módulo `prompts/banco.py` contiene un banco de pruebas para evaluar respuestas
-JSON de Gemini. Cada prompt define una instrucción, un ejemplo de usuario y,
-opcionalmente, un esquema de respuesta. El programa ejecuta cada prompt tres
-veces (15 solicitudes para los cinco ejemplos), cuenta las respuestas JSON
-válidas que incluyen las claves requeridas y guarda el resumen en
-`prompts/registro_resultados.json`.
+El módulo `prompts/banco.py` contiene tres ejemplos para evaluar respuestas
+JSON de Gemini. Cada prompt define una instrucción, un ejemplo de usuario y un
+esquema de respuesta. El programa ejecuta cada prompt tres veces (9 solicitudes
+en total), cuenta las respuestas JSON válidas que incluyen las claves
+requeridas y marca el resultado como consistente solo si los tres intentos
+producen respuestas JSON válidas e idénticas. Guarda los intentos y ese estado
+en `prompts/registro_resultados.json`.
 
 Desde la raíz del repositorio ejecútalo con:
 
-```powershell
-python prompts\banco.py
+```console
+python prompts/banco.py
 ```
 
 Este comando realiza solicitudes reales a Gemini y puede generar costos de API.

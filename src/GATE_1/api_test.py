@@ -11,7 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
 # Endpoint del modelo que recibe la solicitud de generación de contenido.
-url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
 
 
 def main() -> int:

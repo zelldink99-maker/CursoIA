@@ -52,7 +52,7 @@ def armar_peticion(
     if not isinstance(system_instruction, str) or not system_instruction.strip():
         raise ValueError("La instrucción del sistema debe ser un texto no vacío.")
 
-    modelo = "gemini-3.5-flash"
+    modelo = "gemini-3.8-flash"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
     body = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},

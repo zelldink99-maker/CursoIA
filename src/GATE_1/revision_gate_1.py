@@ -19,7 +19,7 @@ from unittest.mock import Mock, patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 GATE_DIR = Path(__file__).resolve().parent
-MODEL = "gemini-3.5-flash"
+MODEL = "gemini-3.8-flash"
 # Permite importar el paquete cuando el verificador se inicia desde cualquier carpeta.
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -213,13 +213,13 @@ def _revisar_dependencias(reporte: Reporte) -> None:
             "requests y python-dotenv están declaradas e instaladas",
         )
 
-    version_ok = sys.version_info >= (3, 9)
+    version_ok = sys.version_info >= (3, 10)
     reporte.agregar(
         "Entorno reproducible",
         "Versión de Python",
         version_ok,
         f"{sys.version_info.major}.{sys.version_info.minor}"
-        + (" (mínimo: 3.9)" if version_ok else " (se requiere 3.9 o superior)"),
+        + (" (mínimo: 3.10)" if version_ok else " (se requiere 3.10 o superior)"),
     )
 
 
@@ -551,7 +551,16 @@ def _revisar_banco_prompts(reporte: Reporte, modulos: dict[str, object]) -> None
     """Comprueba el parseo JSON y la construcción de prompts sin usar la red."""
     banco = modulos["banco_prompts"]
     datos = banco.parsear_respuesta_json('{"nombre":"Lucía","ciudad":"Chile"}')
-    ejemplos_ok = len(banco.BANCO_DE_PROMPTS) == 5
+    ejemplos_ok = len(banco.BANCO_DE_PROMPTS) == 3
+    consistencia_ok = (
+        banco.es_consistente([{"resultado": "igual"}] * banco.INTENTOS_POR_PROMPT)
+        and not banco.es_consistente(
+            [{"resultado": "igual"}, {"resultado": "distinto"}]
+            + [{"resultado": "igual"}] * (banco.INTENTOS_POR_PROMPT - 2)
+        )
+        and not banco.es_consistente([{"resultado": "igual"}])
+        and not banco.es_consistente([])
+    )
     for ejemplo in banco.BANCO_DE_PROMPTS:
         url_ejemplo, cuerpo_ejemplo = banco._armar_peticion_prompt(ejemplo)
         pregunta_ejemplo = ejemplo["ejemplo_usuario"]
@@ -602,15 +611,16 @@ def _revisar_banco_prompts(reporte: Reporte, modulos: dict[str, object]) -> None
         datos == {"nombre": "Lucía", "ciudad": "Chile"}
         and solicitud_ok
         and ejemplos_ok
+        and consistencia_ok
         and json_invalido_rechazado
     )
     reporte.agregar(
         "prompts/banco.py",
         "Validación y preparación local",
         correcto,
-        "valida JSON, construye la solicitud y contiene cinco ejemplos"
+        "valida JSON, construye la solicitud y contiene tres ejemplos"
         if correcto
-        else "falló la validación JSON, la solicitud o el banco de cinco ejemplos",
+        else "falló la validación JSON, la solicitud o el banco de tres ejemplos",
     )
 
 

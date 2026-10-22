@@ -1,0 +1,80 @@
+{
+  "extraccion_contacto": {
+    "tipo": "demostracion",
+    "pregunta": "Extrae nombre, ciudad y profesión de este texto: Lucía Pérez vive en Chile y trabaja como diseñadora.",
+    "intentos": 3,
+    "exitos": 3,
+    "consistente": true,
+    "criterio_consistencia": "respuesta de ejemplo repetida; no mide variaciones de Gemini",
+    "respuestas": [
+      {
+        "nombre": "Lucía Pérez",
+        "ciudad": "Chile",
+        "profesion": "diseñadora"
+      },
+      {
+        "nombre": "Lucía Pérez",
+        "ciudad": "Chile",
+        "profesion": "diseñadora"
+      },
+      {
+        "nombre": "Lucía Pérez",
+        "ciudad": "Chile",
+        "profesion": "diseñadora"
+      }
+    ],
+    "respuesta": {
+      "nombre": "Lucía Pérez",
+      "ciudad": "Chile",
+      "profesion": "diseñadora"
+    }
+  },
+  "clasificacion_sentimiento": {
+    "tipo": "demostracion",
+    "pregunta": "Clasifica el sentimiento de este comentario: El producto llegó rápido y funciona perfectamente.",
+    "intentos": 3,
+    "exitos": 3,
+    "consistente": true,
+    "criterio_consistencia": "respuesta de ejemplo repetida; no mide variaciones de Gemini",
+    "respuestas": [
+      {
+        "sentimiento": "positivo",
+        "motivo": "El comentario indica que el producto llegó rápido y funciona bien."
+      },
+      {
+        "sentimiento": "positivo",
+        "motivo": "El comentario indica que el producto llegó rápido y funciona bien."
+      },
+      {
+        "sentimiento": "positivo",
+        "motivo": "El comentario indica que el producto llegó rápido y funciona bien."
+      }
+    ],
+    "respuesta": {
+      "sentimiento": "positivo",
+      "motivo": "El comentario indica que el producto llegó rápido y funciona bien."
+    }
+  },
+  "resumen_texto": {
+    "tipo": "demostracion",
+    "pregunta": "Resume en una oración: Las abejas polinizan muchas plantas y contribuyen a la producción de alimentos.",
+    "intentos": 3,
+    "exitos": 3,
+    "consistente": true,
+    "criterio_consistencia": "respuesta de ejemplo repetida; no mide variaciones de Gemini",
+    "respuestas": [
+      {
+        "resumen": "Las abejas polinizan plantas y ayudan a producir alimentos."
+      },
+      {
+        "resumen": "Las abejas polinizan plantas y ayudan a producir alimentos."
+      },
+      {
+        "resumen": "Las abejas polinizan plantas y ayudan a producir alimentos."
+      }
+    ],
+    "respuesta": {
+      "resumen": "Las abejas polinizan plantas y ayudan a producir alimentos."
+    }
+  }
+}
