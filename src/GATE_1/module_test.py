@@ -24,7 +24,7 @@ def main() -> int:
 
     # Reutiliza las funciones del módulo hermano para preparar y enviar la petición.
     result = make_request(
-        url="https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        url="https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
         headers=create_headers(api_key),
         payload=create_payload("Explícame cómo funciona la NBA en 20 palabras"),
     )

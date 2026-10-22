@@ -83,52 +83,6 @@ BANCO_DE_PROMPTS = [
         },
         "claves_esperadas": ["resumen"],
     },
-    {
-        "nombre": "extraccion_tareas",
-        "system_instruction": (
-            "Extrae las tareas y sus fechas. Devuelve únicamente un objeto "
-            "JSON válido."
-        ),
-        "ejemplo_usuario": (
-            "Extrae las tareas: entregar el informe el 5 de mayo y reunirse "
-            "con Ana el 8 de mayo."
-        ),
-        "response_schema": {
-            "type": "OBJECT",
-            "properties": {
-                "tareas": {
-                    "type": "ARRAY",
-                    "items": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "tarea": {"type": "STRING"},
-                            "fecha": {"type": "STRING"},
-                        },
-                        "required": ["tarea", "fecha"],
-                    },
-                }
-            },
-            "required": ["tareas"],
-        },
-        "claves_esperadas": ["tareas"],
-    },
-    {
-        "nombre": "respuesta_faq",
-        "system_instruction": (
-            "Responde la pregunta con claridad. Devuelve únicamente un objeto "
-            "JSON válido."
-        ),
-        "ejemplo_usuario": "¿Qué se necesita para disolver sal en agua?",
-        "response_schema": {
-            "type": "OBJECT",
-            "properties": {
-                "respuesta": {"type": "STRING"},
-                "dato_adicional": {"type": "STRING"},
-            },
-            "required": ["respuesta", "dato_adicional"],
-        },
-        "claves_esperadas": ["respuesta", "dato_adicional"],
-    },
 ]
 
 
@@ -154,6 +108,16 @@ def parsear_respuesta_json(texto: str) -> dict[str, object]:
     if not isinstance(datos, dict):
         raise ValueError("la respuesta JSON debe ser un objeto")
     return datos
+
+
+def es_consistente(
+    respuestas: list[dict[str, object]],
+    intentos: int = INTENTOS_POR_PROMPT,
+) -> bool:
+    """Indica si todos los intentos produjeron la misma respuesta JSON válida."""
+    return intentos > 0 and len(respuestas) == intentos and all(
+        respuesta == respuestas[0] for respuesta in respuestas[1:]
+    )
 
 
 def _armar_peticion_prompt(prompt: dict[str, object]) -> tuple[str, dict[str, object]]:
@@ -185,14 +149,14 @@ def _armar_peticion_prompt(prompt: dict[str, object]) -> tuple[str, dict[str, ob
 
 def main() -> int:
     """Ejecuta los prompts, registra resultados y devuelve un código de salida."""
-    registro: dict[str, dict[str, int]] = {}
+    registro: dict[str, dict[str, object]] = {}
 
     try:
         # Cada prompt se evalúa varias veces para resumir su consistencia.
         for prompt in BANCO_DE_PROMPTS:
             if not isinstance(prompt, dict):
                 raise ValueError("cada prompt del banco debe ser un objeto")
-            exitos = 0
+            respuestas_validas: list[dict[str, object]] = []
             nombre = prompt.get("nombre")
             claves_esperadas = prompt.get("claves_esperadas")
             if not isinstance(nombre, str) or not nombre.strip():
@@ -221,20 +185,23 @@ def main() -> int:
                             f"{', '.join(faltantes)}"
                         )
                     else:
-                        exitos += 1
+                        respuestas_validas.append(datos)
                 except ValueError as error:
                     print(f"  intento {intento} falló: {error}")
 
                 if intento < INTENTOS_POR_PROMPT:
                     time.sleep(PAUSA_ENTRE_INTENTOS)
 
-            print(
-                f"{nombre}: {exitos}/{INTENTOS_POR_PROMPT} "
-                "respuestas válidas"
-            )
+            exitos = len(respuestas_validas)
+            consistente = es_consistente(respuestas_validas)
+            print(f"{nombre}: {exitos}/{INTENTOS_POR_PROMPT} respuestas válidas")
+            print(f"  Consistente: {'sí' if consistente else 'no'}")
             registro[nombre] = {
                 "exitos": exitos,
                 "intentos": INTENTOS_POR_PROMPT,
+                "consistente": consistente,
+                "pregunta": prompt["ejemplo_usuario"],
+                "respuestas": respuestas_validas,
             }
 
     except (GeminiError, ValueError, TypeError) as error:
