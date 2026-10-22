@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # Mantiene la configuración independiente del directorio desde el que se ejecute.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = PROJECT_ROOT / ".env"
-MODEL = "gemini-3.5-flash"
+MODEL = "gemini-3.8-flash"
 API_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
 )

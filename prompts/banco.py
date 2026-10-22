@@ -46,11 +46,96 @@ BANCO_DE_PROMPTS = [
         },
         "claves_esperadas": ["nombre", "ciudad", "profesion"],
     },
+    {
+        "nombre": "clasificacion_sentimiento",
+        "system_instruction": (
+            "Clasifica el sentimiento del texto. Devuelve únicamente un objeto "
+            "JSON válido."
+        ),
+        "ejemplo_usuario": (
+            "Clasifica el sentimiento de este comentario: "
+            "El producto llegó rápido y funciona perfectamente."
+        ),
+        "response_schema": {
+            "type": "OBJECT",
+            "properties": {
+                "sentimiento": {"type": "STRING"},
+                "motivo": {"type": "STRING"},
+            },
+            "required": ["sentimiento", "motivo"],
+        },
+        "claves_esperadas": ["sentimiento", "motivo"],
+    },
+    {
+        "nombre": "resumen_texto",
+        "system_instruction": (
+            "Resume el contenido solicitado. Devuelve únicamente un objeto "
+            "JSON válido."
+        ),
+        "ejemplo_usuario": (
+            "Resume en una oración: Las abejas polinizan muchas plantas y "
+            "contribuyen a la producción de alimentos."
+        ),
+        "response_schema": {
+            "type": "OBJECT",
+            "properties": {"resumen": {"type": "STRING"}},
+            "required": ["resumen"],
+        },
+        "claves_esperadas": ["resumen"],
+    },
+    {
+        "nombre": "extraccion_tareas",
+        "system_instruction": (
+            "Extrae las tareas y sus fechas. Devuelve únicamente un objeto "
+            "JSON válido."
+        ),
+        "ejemplo_usuario": (
+            "Extrae las tareas: entregar el informe el 5 de mayo y reunirse "
+            "con Ana el 8 de mayo."
+        ),
+        "response_schema": {
+            "type": "OBJECT",
+            "properties": {
+                "tareas": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "tarea": {"type": "STRING"},
+                            "fecha": {"type": "STRING"},
+                        },
+                        "required": ["tarea", "fecha"],
+                    },
+                }
+            },
+            "required": ["tareas"],
+        },
+        "claves_esperadas": ["tareas"],
+    },
+    {
+        "nombre": "respuesta_faq",
+        "system_instruction": (
+            "Responde la pregunta con claridad. Devuelve únicamente un objeto "
+            "JSON válido."
+        ),
+        "ejemplo_usuario": "¿Qué se necesita para disolver sal en agua?",
+        "response_schema": {
+            "type": "OBJECT",
+            "properties": {
+                "respuesta": {"type": "STRING"},
+                "dato_adicional": {"type": "STRING"},
+            },
+            "required": ["respuesta", "dato_adicional"],
+        },
+        "claves_esperadas": ["respuesta", "dato_adicional"],
+    },
 ]
 
 
 def parsear_respuesta_json(texto: str) -> dict[str, object]:
     """Convierte la respuesta del modelo en un objeto JSON."""
+    if not isinstance(texto, str):
+        raise ValueError("la respuesta debe ser texto")
     contenido = texto.strip()
     # Algunos modelos envuelven el JSON en bloques Markdown; se quitan antes del parseo.
     if contenido.startswith("```"):
@@ -73,17 +158,22 @@ def parsear_respuesta_json(texto: str) -> dict[str, object]:
 
 def _armar_peticion_prompt(prompt: dict[str, object]) -> tuple[str, dict[str, object]]:
     """Añade la instrucción y el esquema al cuerpo creado por el cliente Gemini."""
-    pregunta = prompt["ejemplo_usuario"]
-    if not isinstance(pregunta, str):
+    if not isinstance(prompt, dict):
+        raise ValueError("cada prompt debe ser un objeto")
+    pregunta = prompt.get("ejemplo_usuario")
+    if not isinstance(pregunta, str) or not pregunta.strip():
         raise ValueError("ejemplo_usuario debe ser texto")
 
-    url, cuerpo = armar_peticion(pregunta)
-    cuerpo["systemInstruction"] = {
-        "parts": [{"text": prompt["system_instruction"]}]
-    }
+    instruccion = prompt.get("system_instruction")
+    if not isinstance(instruccion, str) or not instruccion.strip():
+        raise ValueError("system_instruction debe ser texto no vacío")
+
+    url, cuerpo = armar_peticion(pregunta, instruccion)
 
     esquema = prompt.get("response_schema")
     if esquema is not None:
+        if not isinstance(esquema, dict):
+            raise ValueError("response_schema debe ser un objeto")
         # Solicita JSON y comunica al endpoint la forma esperada de la respuesta.
         cuerpo["generationConfig"] = {
             "responseMimeType": "application/json",
@@ -100,9 +190,19 @@ def main() -> int:
     try:
         # Cada prompt se evalúa varias veces para resumir su consistencia.
         for prompt in BANCO_DE_PROMPTS:
+            if not isinstance(prompt, dict):
+                raise ValueError("cada prompt del banco debe ser un objeto")
             exitos = 0
-            nombre = str(prompt["nombre"])
-            claves_esperadas = prompt["claves_esperadas"]
+            nombre = prompt.get("nombre")
+            claves_esperadas = prompt.get("claves_esperadas")
+            if not isinstance(nombre, str) or not nombre.strip():
+                raise ValueError("cada prompt debe tener un nombre no vacío")
+            if not isinstance(claves_esperadas, list) or not all(
+                isinstance(clave, str) and clave for clave in claves_esperadas
+            ):
+                raise ValueError(
+                    f"claves_esperadas debe ser una lista de textos para {nombre}"
+                )
 
             for intento in range(1, INTENTOS_POR_PROMPT + 1):
                 url, cuerpo = _armar_peticion_prompt(prompt)
@@ -137,7 +237,7 @@ def main() -> int:
                 "intentos": INTENTOS_POR_PROMPT,
             }
 
-    except (GeminiError, ValueError) as error:
+    except (GeminiError, ValueError, TypeError) as error:
         print(f"Error al ejecutar el banco de prompts: {error}", file=sys.stderr)
         return 1
 

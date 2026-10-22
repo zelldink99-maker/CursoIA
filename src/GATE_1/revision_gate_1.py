@@ -10,7 +10,7 @@ import os
 import re
 import subprocess
 import sys
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from typing import Optional
@@ -26,6 +26,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # El propósito y el resultado esperado se imprimen antes de ejecutar las comprobaciones.
 MODULES = {
+    "aritmetica.py": (
+        "Realiza operaciones aritméticas básicas.",
+        "La división por cero se rechaza explícitamente.",
+    ),
     "api_test.py": (
         "Hace una petición sencilla a Gemini para comprobar el endpoint.",
         "Con una clave válida, Gemini devuelve una respuesta HTTP exitosa con texto.",
@@ -57,6 +61,14 @@ MODULES = {
     "peticiones.py": (
         "Construye el cuerpo y encabezados HTTP y envía una petición POST.",
         "El cuerpo conserva la pregunta, la clave va en un encabezado y se recibe texto.",
+    ),
+    "prompts/banco.py": (
+        "Ejecuta un banco de prompts estructurados y registra resultados JSON.",
+        "La respuesta JSON se valida y la solicitud incorpora instrucciones y esquema.",
+    ),
+    "test.py": (
+        "Confirma que Python puede ejecutar un script sencillo.",
+        "El script imprime un saludo y termina correctamente.",
     ),
 }
 
@@ -104,6 +116,7 @@ def _importar_modulos() -> dict[str, object]:
     """Importa módulos sin lanzar los scripts que hacen llamadas al importarse."""
     from src.GATE_1 import (
         api_test,
+        aritmetica,
         consumir_gemini,
         costo,
         latencia,
@@ -112,9 +125,11 @@ def _importar_modulos() -> dict[str, object]:
         monolitico,
         peticiones,
     )
+    from prompts import banco as banco_prompts
 
     return {
         "api_test": api_test,
+        "aritmetica": aritmetica,
         "consumir_gemini": consumir_gemini,
         "costo": costo,
         "latencia": latencia,
@@ -122,12 +137,21 @@ def _importar_modulos() -> dict[str, object]:
         "module_test": module_test,
         "monolitico": monolitico,
         "peticiones": peticiones,
+        "banco_prompts": banco_prompts,
     }
 
 
 def _revisar_sintaxis(reporte: Reporte) -> None:
     """Analiza los módulos del Gate 1 sin ejecutarlos."""
-    archivos = [(nombre, GATE_DIR / nombre) for nombre in MODULES]
+    archivos = [
+        (
+            nombre,
+            PROJECT_ROOT / nombre
+            if nombre.startswith("prompts/")
+            else GATE_DIR / nombre,
+        )
+        for nombre in MODULES
+    ]
     archivos.append(("revision_gate_1.py", Path(__file__)))
     for nombre, ruta in archivos:
         try:
@@ -145,8 +169,25 @@ def _revisar_dependencias(reporte: Reporte) -> None:
         reporte.agregar("Entorno reproducible", "requirements.txt", False, "no existe")
         return
 
+    try:
+        contenido = requirements.read_bytes()
+        codificacion = (
+            "utf-16"
+            if contenido.startswith((b"\xff\xfe", b"\xfe\xff"))
+            else "utf-8-sig"
+        )
+        lineas = contenido.decode(codificacion).splitlines()
+    except (OSError, UnicodeError) as error:
+        reporte.agregar(
+            "Entorno reproducible",
+            "requirements.txt",
+            False,
+            f"no se pudo leer el archivo: {error}",
+        )
+        return
+
     declaradas: set[str] = set()
-    for linea in requirements.read_text(encoding="utf-8-sig").splitlines():
+    for linea in lineas:
         entrada = linea.strip()
         if entrada and not entrada.startswith("#"):
             declaradas.add(re.split(r"[<>=!~]", entrada, maxsplit=1)[0].lower())
@@ -267,20 +308,31 @@ def _revisar_peticiones(reporte: Reporte, modulos: dict[str, object]) -> None:
             headers,
             peticiones.create_payload(prompt),
         )
+    with patch.object(
+        peticiones.requests,
+        "request",
+        side_effect=peticiones.requests.ConnectionError("fallo simulado"),
+    ):
+        resultado_error = peticiones.make_request(
+            "https://example.invalid/generateContent",
+            headers,
+            peticiones.create_payload(prompt),
+        )
     cuerpo_ok = cuerpo == {"contents": [{"parts": [{"text": prompt}]}]}
     request_ok = (
         resultado == llamada.text
         and request.call_args.kwargs["headers"]["x-goog-api-key"] == "clave-de-prueba"
         and request.call_args.kwargs["data"] == peticiones.create_payload(prompt)
+        and resultado_error.startswith("Error:")
     )
     correcto = cuerpo_ok and headers.get("x-goog-api-key") == "clave-de-prueba" and request_ok
     reporte.agregar(
         "peticiones.py",
         "Cuerpo, encabezado y envío simulados",
         correcto,
-        "la pregunta se conserva y la solicitud usa autenticación por encabezado"
+        "la solicitud usa encabezado seguro y comunica errores de conexión"
         if correcto
-        else "falló la comprobación del cuerpo, encabezado o envío",
+        else "falló la comprobación del cuerpo, encabezado, envío o error HTTP",
     )
 
 
@@ -290,16 +342,79 @@ def _revisar_costo(reporte: Reporte, modulos: dict[str, object]) -> None:
         "usageMetadata": {
             "promptTokenCount": 850,
             "candidatesTokenCount": 320,
-            "totalTokenCount": 1170,
+            "thoughtsTokenCount": 7,
+            "totalTokenCount": 1177,
         }
     }
-    esperado = 850 * 0.00000010 + 320 * 0.00000040
-    obtenido = modulos["costo"].calcular_costo(datos, 0.00000010, 0.00000040)
+    tarifa_entrada = modulos["costo"].PRECIO_ENTRADA_POR_TOKEN
+    tarifa_salida = modulos["costo"].PRECIO_SALIDA_POR_TOKEN
+    esperado = 850 * tarifa_entrada + (320 + 7) * tarifa_salida
+    obtenido = modulos["costo"].calcular_costo(datos)
+    tarifa_publicada_ok = (
+        modulos["costo"].MODELO_TARIFADO == "gemini-3.8-flash"
+        and modulos["costo"].PRECIO_ENTRADA_USD_POR_MILLON == 0.75
+        and modulos["costo"].PRECIO_SALIDA_USD_POR_MILLON == 3.75
+    )
+    url, _ = modulos["monolitico"].armar_peticion(
+        "prueba", "Responde brevemente."
+    )
+    modelo_solicitud_ok = modulos["costo"].MODELO_TARIFADO in url
     reporte.agregar(
         "costo.py",
-        "Cálculo de ejemplo",
-        abs(obtenido - esperado) < 1e-12,
-        f"esperado {esperado:.8f}; obtenido {obtenido:.8f}",
+        "Tarifa publicada y cálculo por uso",
+        tarifa_publicada_ok
+        and modelo_solicitud_ok
+        and abs(obtenido - esperado) < 1e-12,
+        f"{modulos['costo'].MODELO_TARIFADO}: esperado ${esperado:.8f}; "
+        f"obtenido ${obtenido:.8f}",
+    )
+
+
+def _revisar_validaciones(reporte: Reporte, modulos: dict[str, object]) -> None:
+    """Comprueba que varias entradas inválidas se rechacen explícitamente."""
+    try:
+        modulos["aritmetica"].dividir(10, 0)
+    except ZeroDivisionError:
+        division_por_cero_rechazada = True
+    else:
+        division_por_cero_rechazada = False
+
+    try:
+        modulos["costo"].calcular_costo({}, 0.1, 0.2)
+    except ValueError:
+        metadatos_invalidos_rechazados = True
+    else:
+        metadatos_invalidos_rechazados = False
+
+    try:
+        modulos["latencia"].Latencia(pregunta=None)
+    except ValueError:
+        pregunta_invalida_rechazada = True
+    else:
+        pregunta_invalida_rechazada = False
+
+    try:
+        modulos["banco_prompts"].parsear_respuesta_json(None)
+    except ValueError:
+        respuesta_invalida_rechazada = True
+    else:
+        respuesta_invalida_rechazada = False
+
+    correcto = all(
+        (
+            division_por_cero_rechazada,
+            metadatos_invalidos_rechazados,
+            pregunta_invalida_rechazada,
+            respuesta_invalida_rechazada,
+        )
+    )
+    reporte.agregar(
+        "Validación de errores",
+        "Entradas inválidas en módulos locales",
+        correcto,
+        "división, metadatos, latencia y JSON rechazan entradas inválidas"
+        if correcto
+        else "una o más entradas inválidas no se rechazaron explícitamente",
     )
 
 
@@ -332,9 +447,17 @@ def _revisar_monolitico(reporte: Reporte, modulos: dict[str, object]) -> None:
     monolitico = modulos["monolitico"]
     clave = "clave-local-de-prueba"
     with patch.dict(os.environ, {"GEMINI_API_KEY": clave}):
-        url, body = monolitico.armar_peticion("pregunta")
+        url, body = monolitico.armar_peticion("pregunta", "Responde brevemente.")
         respuesta = Mock()
-        respuesta.json.return_value = {"candidates": []}
+        respuesta_json = {
+            "candidates": [],
+            "usageMetadata": {
+                "promptTokenCount": 12,
+                "candidatesTokenCount": 48,
+                "totalTokenCount": 60,
+            },
+        }
+        respuesta.json.return_value = respuesta_json
         with patch.object(
             monolitico.requests, "post", return_value=respuesta
         ) as post:
@@ -344,7 +467,9 @@ def _revisar_monolitico(reporte: Reporte, modulos: dict[str, object]) -> None:
         clave not in url
         and llamada.kwargs["headers"].get("x-goog-api-key") == clave
         and llamada.kwargs["timeout"] > 0
-        and resultado == {"candidates": []}
+        and resultado == respuesta_json
+        and monolitico.extraer_metadatos_uso(resultado)
+        == respuesta_json["usageMetadata"]
     )
     reporte.agregar(
         "monolitico.py",
@@ -353,6 +478,50 @@ def _revisar_monolitico(reporte: Reporte, modulos: dict[str, object]) -> None:
         "la clave no aparece en la URL y se envía en el encabezado"
         if correcto
         else "la clave podría exponerse o la petición no cumplió lo esperado",
+    )
+
+    respuesta_demo = {
+        "candidates": [
+            {"content": {"parts": [{"text": "respuesta de prueba"}]}}
+        ],
+        "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 48,
+            "totalTokenCount": 60,
+        },
+    }
+    with patch.object(monolitico, "enviar_peticion", return_value=respuesta_demo):
+        with redirect_stdout(StringIO()) as salida:
+            codigo_demo = monolitico.main()
+    demo_ok = (
+        codigo_demo == 0
+        and "respuesta de prueba" in salida.getvalue()
+        and "Tokens de entrada: 12" in salida.getvalue()
+        and "Tokens de salida: 48" in salida.getvalue()
+        and "Total: 60" in salida.getvalue()
+    )
+    reporte.agregar(
+        "monolitico.py",
+        "Presentación de tokens de respuesta",
+        demo_ok,
+        "muestra tokens de entrada, salida y total"
+        if demo_ok
+        else "no se mostraron correctamente los metadatos de tokens",
+    )
+
+    try:
+        monolitico.extraer_metadatos_uso({"candidates": []})
+    except monolitico.GeminiResponseError:
+        metadata_ausente_rechazada = True
+    else:
+        metadata_ausente_rechazada = False
+    reporte.agregar(
+        "monolitico.py",
+        "Validación de metadatos de tokens",
+        metadata_ausente_rechazada,
+        "informa explícitamente cuando falta usageMetadata"
+        if metadata_ausente_rechazada
+        else "no se rechazaron los metadatos de uso ausentes",
     )
 
 
@@ -375,6 +544,73 @@ def _revisar_latencia(reporte: Reporte, modulos: dict[str, object]) -> None:
         "Dos solicitudes simuladas",
         correcto,
         f"se hicieron {enviar.call_count} envíos; promedio {promedio:.4f} s",
+    )
+
+
+def _revisar_banco_prompts(reporte: Reporte, modulos: dict[str, object]) -> None:
+    """Comprueba el parseo JSON y la construcción de prompts sin usar la red."""
+    banco = modulos["banco_prompts"]
+    datos = banco.parsear_respuesta_json('{"nombre":"Lucía","ciudad":"Chile"}')
+    ejemplos_ok = len(banco.BANCO_DE_PROMPTS) == 5
+    for ejemplo in banco.BANCO_DE_PROMPTS:
+        url_ejemplo, cuerpo_ejemplo = banco._armar_peticion_prompt(ejemplo)
+        pregunta_ejemplo = ejemplo["ejemplo_usuario"]
+        instruccion_ejemplo = ejemplo["system_instruction"]
+        esquema_ejemplo = ejemplo["response_schema"]
+        propiedades_ejemplo = (
+            esquema_ejemplo.get("properties", {})
+            if isinstance(esquema_ejemplo, dict)
+            else {}
+        )
+        ejemplos_ok = ejemplos_ok and (
+            "/models/" in url_ejemplo
+            and ":generateContent" in url_ejemplo
+            and cuerpo_ejemplo["contents"][0]["parts"][0]["text"]
+            == pregunta_ejemplo
+            and cuerpo_ejemplo["systemInstruction"]["parts"][0]["text"]
+            == instruccion_ejemplo
+            and cuerpo_ejemplo["generationConfig"]["responseMimeType"]
+            == "application/json"
+            and cuerpo_ejemplo["generationConfig"]["responseSchema"]
+            == esquema_ejemplo
+            and all(clave in propiedades_ejemplo for clave in ejemplo["claves_esperadas"])
+        )
+
+    prompt = {
+        "ejemplo_usuario": "Extrae nombre y ciudad.",
+        "system_instruction": "Devuelve únicamente JSON.",
+        "response_schema": {
+            "type": "OBJECT",
+            "properties": {"nombre": {"type": "STRING"}},
+        },
+    }
+    _, cuerpo = banco._armar_peticion_prompt(prompt)
+    solicitud_ok = (
+        cuerpo["contents"] == [{"parts": [{"text": "Extrae nombre y ciudad."}]}]
+        and cuerpo["systemInstruction"]["parts"][0]["text"]
+        == "Devuelve únicamente JSON."
+        and cuerpo["generationConfig"]["responseMimeType"] == "application/json"
+    )
+    try:
+        banco.parsear_respuesta_json("no es JSON")
+    except ValueError:
+        json_invalido_rechazado = True
+    else:
+        json_invalido_rechazado = False
+
+    correcto = (
+        datos == {"nombre": "Lucía", "ciudad": "Chile"}
+        and solicitud_ok
+        and ejemplos_ok
+        and json_invalido_rechazado
+    )
+    reporte.agregar(
+        "prompts/banco.py",
+        "Validación y preparación local",
+        correcto,
+        "valida JSON, construye la solicitud y contiene cinco ejemplos"
+        if correcto
+        else "falló la validación JSON, la solicitud o el banco de cinco ejemplos",
     )
 
 
@@ -444,6 +680,26 @@ def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
         else "la suma o el resultado de demostración no coincide",
     )
 
+    with patch.object(
+        modulo_main,
+        "obtener_dato_de_prueba",
+        side_effect=RuntimeError("fallo local simulado"),
+    ):
+        with redirect_stdout(StringIO()):
+            with redirect_stderr(StringIO()) as errores:
+                codigo_main_error = modulo_main.main()
+    main_error_ok = (
+        codigo_main_error == 1
+        and "fallo local simulado" in errores.getvalue()
+    )
+    reporte.agregar(
+        "main.py",
+        "Manejo de error del cliente",
+        main_error_ok,
+        "muestra el fallo esperado en stderr y devuelve código 1"
+        if main_error_ok
+        else "no comunicó correctamente el error del cliente",
+    )
 
 def _probar_api(reporte: Reporte, modulos: dict[str, object], clave: str) -> None:
     """Hace una petición real para comprobar disponibilidad y redacta la clave."""
@@ -483,7 +739,7 @@ def main() -> int:
     # La prueba real se puede omitir para ejecutar únicamente verificaciones locales.
     parser = argparse.ArgumentParser(
         description=(
-            "Describe y verifica los módulos de GATE_1. "
+            "Describe y verifica los módulos de GATE_1 y el banco de prompts. "
             "Por defecto comprueba Gemini con una petición real."
         )
     )
@@ -528,11 +784,13 @@ def main() -> int:
 
     if modulos:
         print("\n4. PRUEBAS LOCALES (sin llamadas de red)")
+        _revisar_validaciones(reporte, modulos)
         _revisar_peticiones(reporte, modulos)
         _revisar_costo(reporte, modulos)
         _revisar_cliente(reporte, modulos)
         _revisar_monolitico(reporte, modulos)
         _revisar_latencia(reporte, modulos)
+        _revisar_banco_prompts(reporte, modulos)
         _revisar_scripts(reporte, modulos)
 
     print("\n5. DISPONIBILIDAD DE LA API")

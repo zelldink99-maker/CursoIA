@@ -1,5 +1,7 @@
 """Calcula el costo de uso de una respuesta de la API."""
 
+import math
+from numbers import Real
 from typing import TypedDict
 
 
@@ -11,43 +13,56 @@ class MetadatosUso(TypedDict):
     totalTokenCount: int
 
 
+class MetadatosUsoConPensamiento(MetadatosUso, total=False):
+    """Incluye los tokens de pensamiento cuando Gemini los reporta aparte."""
+
+    thoughtsTokenCount: int
+
+
 class DatosRespuesta(TypedDict):
     """Parte de la respuesta necesaria para calcular el costo."""
 
-    usageMetadata: MetadatosUso
+    usageMetadata: MetadatosUsoConPensamiento
+
+
+MODELO_TARIFADO = "gemini-3.8-flash"
+PRECIO_ENTRADA_USD_POR_MILLON = 0.75
+PRECIO_SALIDA_USD_POR_MILLON = 3.75
+PRECIO_ENTRADA_POR_TOKEN = PRECIO_ENTRADA_USD_POR_MILLON / 1_000_000
+PRECIO_SALIDA_POR_TOKEN = PRECIO_SALIDA_USD_POR_MILLON / 1_000_000
 
 
 def calcular_costo(
     datos: DatosRespuesta,
-    precio_entrada: float,
-    precio_salida: float,
+    precio_entrada: float = PRECIO_ENTRADA_POR_TOKEN,
+    precio_salida: float = PRECIO_SALIDA_POR_TOKEN,
 ) -> float:
-    """Calcula el costo usando el precio por token de entrada y de salida."""
-    # 1. Obtiene los metadatos con el consumo de tokens.
-    uso = datos["usageMetadata"]
+    """Estima el costo con precios USD/token; incluye tokens de pensamiento."""
+    if not isinstance(datos, dict):
+        raise ValueError("La respuesta debe ser un objeto con metadatos de uso.")
+    uso = datos.get("usageMetadata")
+    if not isinstance(uso, dict):
+        raise ValueError("La respuesta no contiene metadatos de uso válidos.")
 
-    # 2. Separa los tokens enviados a la API de los tokens generados.
-    tokens_entrada = uso["promptTokenCount"]
-    tokens_salida = uso["candidatesTokenCount"]
+    tokens_entrada = uso.get("promptTokenCount")
+    tokens_salida = uso.get("candidatesTokenCount")
+    tokens_pensamiento = uso.get("thoughtsTokenCount", 0)
+    if any(
+        not isinstance(tokens, int) or isinstance(tokens, bool) or tokens < 0
+        for tokens in (tokens_entrada, tokens_salida, tokens_pensamiento)
+    ):
+        raise ValueError("Los contadores de tokens deben ser enteros no negativos.")
 
-    # 3. Multiplica cada consumo por su tarifa correspondiente.
-    costo_entrada = tokens_entrada * precio_entrada
-    costo_salida = tokens_salida * precio_salida
+    precios = (precio_entrada, precio_salida)
+    if any(
+        not isinstance(precio, Real)
+        or isinstance(precio, bool)
+        or not math.isfinite(precio)
+        or precio < 0
+        for precio in precios
+    ):
+        raise ValueError("Los precios por token deben ser números finitos no negativos.")
 
-    # 4. Suma ambos importes y devuelve el costo total.
-    return costo_entrada + costo_salida
-
-
-if __name__ == "__main__":
-    # Ejemplo de respuesta con 850 tokens de entrada y 320 de salida.
-    datos_ejemplo: DatosRespuesta = {
-        "usageMetadata": {
-            "promptTokenCount": 850,
-            "candidatesTokenCount": 320,
-            "totalTokenCount": 1170,
-        }
-    }
-
-    # Las tarifas están expresadas en costo por token.
-    costo = calcular_costo(datos_ejemplo, 0.00000010, 0.00000040)
-    print(costo)
+    return tokens_entrada * precio_entrada + (
+        tokens_salida + tokens_pensamiento
+    ) * precio_salida
