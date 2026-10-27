@@ -163,8 +163,30 @@ al agotarse los intentos, `consultar_modelo` los comunica como
 errores de configuración y respuestas inválidas se propagan con su tipo
 específico.
 
-Para comprobar la lógica sin llamadas de red, demoras ni costo de API, ejecuta
-el verificador local:
+Para comprobar la lógica interna del cliente sin llamadas de red, demoras ni
+costo de API, ejecuta las pruebas unitarias con pytest:
+
+```console
+python -m pytest tests/test_cliente.py -v
+```
+
+También puedes ejecutar el archivo de pruebas directamente; prepara la ruta
+del proyecto y lanza pytest automáticamente:
+
+```console
+python tests/test_cliente.py
+```
+
+La suite usa mocks para la API y el tiempo. Cubre clasificación HTTP, el camino
+feliz, reintentos, agotamiento, validación y acumulación de costos y manejo de
+errores del cliente. El paquete `pytest` está declarado en `requirements.txt`;
+instala o actualiza el entorno con:
+
+```console
+python -m pip install -r requirements.txt
+```
+
+El verificador general local también ejecuta comprobaciones simuladas:
 
 ```console
 python src/GATE_1/revision_gate_1.py --omitir-api
@@ -268,8 +290,9 @@ del banco de prompts sin enviar solicitudes de red.
 - `prompts/`: banco de prompts estructurados y resultados agregados de sus
   ejecuciones.
 - `docs/`: documentación técnica, diagramas y decisiones de arquitectura.
-- `tests/`: pruebas del código; se incorporarán conforme el proyecto lo
-  requiera.
+- `tests/`: pruebas unitarias del cliente con pytest y mocks. Se ejecutan desde
+  la raíz con `python -m pytest tests/test_cliente.py -v` o directamente con
+  `python tests/test_cliente.py`.
 - `requirements.txt`: dependencias de Python necesarias para reconstruir el
   entorno.
 - `.env.example`: plantilla de variables de entorno sin credenciales reales.

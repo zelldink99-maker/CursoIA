@@ -23,7 +23,8 @@ MODEL = "gemini-3.8-flash"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# El propósito y el resultado esperado se imprimen antes de ejecutar las comprobaciones.
+# Este catálogo sirve como guía de lectura y se imprime antes de las pruebas.
+# Cada entrada describe lo que hace el módulo y el comportamiento que se espera.
 MODULES = {
     "aritmetica.py": (
         "Realiza operaciones aritméticas básicas.",
@@ -199,6 +200,8 @@ def _revisar_dependencias(reporte: Reporte) -> None:
     for linea in lineas:
         entrada = linea.strip()
         if entrada and not entrada.startswith("#"):
+            # Compara el nombre de la distribución (p. ej. python-dotenv),
+            # no el nombre del módulo que luego se importa (dotenv).
             declaradas.add(re.split(r"[<>=!~]", entrada, maxsplit=1)[0].lower())
 
     paquetes = {"requests": "requests", "python-dotenv": "dotenv"}
@@ -237,6 +240,7 @@ def _revisar_credenciales(reporte: Reporte) -> str:
     if importlib.util.find_spec("dotenv") is not None:
         from dotenv import load_dotenv
 
+        # Carga la configuración local si python-dotenv está disponible.
         load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
     archivo_ignore = PROJECT_ROOT / ".gitignore"
     # git check-ignore confirma la regla efectiva, no solo el texto del .gitignore.
@@ -265,6 +269,7 @@ def _revisar_credenciales(reporte: Reporte) -> str:
     )
 
     # Busca patrones de claves incrustadas en los scripts de este Gate.
+    # Si un archivo no puede leerse, el resultado se considera inseguro.
     clave_en_codigo = False
     patron_clave_google = re.compile(r"AIza[0-9A-Za-z_-]{20,}")
     for ruta in GATE_DIR.glob("*.py"):
@@ -320,6 +325,7 @@ def _revisar_peticiones(reporte: Reporte, modulos: dict[str, object]) -> None:
     headers = peticiones.create_headers("clave-de-prueba")
     llamada = Mock()
     llamada.text = '{"respuesta":"simulada"}'
+    # Sustituye la llamada HTTP: estas comprobaciones nunca contactan al servicio.
     with patch.object(peticiones.requests, "request", return_value=llamada) as request:
         resultado = peticiones.make_request(
             "https://example.invalid/generateContent",
@@ -360,6 +366,7 @@ def _revisar_peticiones(reporte: Reporte, modulos: dict[str, object]) -> None:
 
 def _revisar_costo(reporte: Reporte, modulos: dict[str, object]) -> None:
     """Compara el cálculo del módulo con un resultado conocido."""
+    # Los tokens de pensamiento se cobran como tokens de salida.
     datos = {
         "usageMetadata": {
             "promptTokenCount": 850,
@@ -392,6 +399,7 @@ def _revisar_costo(reporte: Reporte, modulos: dict[str, object]) -> None:
 
 def _revisar_validaciones(reporte: Reporte, modulos: dict[str, object]) -> None:
     """Comprueba que varias entradas inválidas se rechacen explícitamente."""
+    # Cada caso debe lanzar el error previsto; no basta con que la función termine.
     try:
         modulos["aritmetica"].dividir(10, 0)
     except ZeroDivisionError:
@@ -485,6 +493,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
         },
     }
 
+    # Aísla el acumulador para que el resultado no dependa de llamadas anteriores.
     with patch.object(cliente, "costo_total_sesion", 0.0):
         with patch.object(cliente.monolitico, "enviar_peticion", return_value=respuesta):
             texto = cliente.consultar_modelo("¿Cuál es la capital de Chile?")
@@ -493,6 +502,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
 
         credencial_rechazada = True
         credencial_sin_reintento = True
+        # Los errores de autenticación son permanentes y deben fallar sin reintentar.
         for codigo in (401, 403):
             with patch.object(
                 cliente.monolitico,
@@ -509,6 +519,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
                     credencial_rechazada = False
             credencial_sin_reintento &= solicitud.call_count == 1
 
+        # Un límite de uso (429) debe dar lugar a un reintento tras la espera.
         with patch.object(
             cliente.monolitico,
             "enviar_peticion",
@@ -526,6 +537,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
             and texto_reintentado == "Santiago es la capital de Chile."
         )
 
+        # Un error de solicitud (400) es permanente y no debe repetirse.
         with patch.object(
             cliente.monolitico,
             "enviar_peticion",
@@ -538,6 +550,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
             else:
                 error_permanente_no_reintentado = False
 
+        # Un error de servicio (503) es transitorio y se puede reintentar.
         with patch.object(
             cliente.monolitico,
             "enviar_peticion",
@@ -555,6 +568,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
             and texto_503 == "Santiago es la capital de Chile."
         )
 
+        # También se reintentan fallos de conexión y tiempos de espera.
         errores_red_reintentados = True
         for error_red in (
             cliente.monolitico.GeminiTimeoutError("timeout simulado"),
@@ -575,6 +589,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
                 and resultado_red == "Santiago es la capital de Chile."
             )
 
+        # Al agotar los intentos, el cliente comunica el fallo como RuntimeError.
         with patch.object(
             cliente,
             "_enviar_peticion_reintentable",
@@ -590,6 +605,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
                         reintentos_agotados = False
         intentos_agotados_correctos = enviar.call_count == 3
 
+    # Fuerza el mayor jitter para verificar el cálculo y el límite de espera.
     with patch.object(reintentos.time, "sleep") as dormir:
         with patch.object(
             reintentos.random,
@@ -618,6 +634,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
         and max(esperas) <= 5
     )
 
+    # Comprueba el manejo del error por la interfaz de consola, sin llamar a Gemini.
     with patch.object(
         cliente,
         "consultar_modelo",
@@ -629,6 +646,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
         codigo_error == 1 and "fallo simulado" in salida_error.getvalue()
     )
 
+    # main() debe hacer una consulta y mostrar el costo acumulado al terminar.
     with patch.object(cliente, "costo_total_sesion", 0.00008):
         with patch.object(cliente, "consultar_modelo", return_value="Santiago") as consulta:
             with redirect_stdout(StringIO()) as salida_principal:
@@ -640,6 +658,7 @@ def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> No
         and "Costo acumulado de la sesión: $0.00008" in salida_principal.getvalue()
     )
 
+    # La simulación actualiza el costo igual que una respuesta recibida del modelo.
     def consulta_ensayo_simulada(pregunta: str) -> str:
         """Registra uso simulado igual que una respuesta válida del proveedor."""
         cliente.registrar_costo(respuesta)
@@ -697,6 +716,7 @@ def _revisar_monolitico(reporte: Reporte, modulos: dict[str, object]) -> None:
     """Comprueba el cliente simple con una respuesta HTTP simulada."""
     monolitico = modulos["monolitico"]
     clave = "clave-local-de-prueba"
+    # La clave se inyecta solo durante la prueba y se verifica que no vaya en la URL.
     with patch.dict(os.environ, {"GEMINI_API_KEY": clave}):
         url, body = monolitico.armar_peticion("pregunta", "Responde brevemente.")
         respuesta = Mock()
@@ -788,6 +808,7 @@ def _revisar_latencia(reporte: Reporte, modulos: dict[str, object]) -> None:
             "totalTokenCount": 5,
         }
     }
+    # Las respuestas simuladas permiten comprobar cantidad y promedio sin red.
     with patch.object(latencia, "enviar_peticion", return_value=datos) as enviar:
         with redirect_stdout(StringIO()):
             promedio = latencia.Latencia(intentos=2).ejecutar()
@@ -805,6 +826,7 @@ def _revisar_banco_prompts(reporte: Reporte, modulos: dict[str, object]) -> None
     banco = modulos["banco_prompts"]
     datos = banco.parsear_respuesta_json('{"nombre":"Lucía","ciudad":"Chile"}')
     ejemplos_ok = len(banco.BANCO_DE_PROMPTS) == 3
+    # La consistencia exige resultados iguales y también el número esperado de intentos.
     consistencia_ok = (
         banco.es_consistente([{"resultado": "igual"}] * banco.INTENTOS_POR_PROMPT)
         and not banco.es_consistente(
@@ -883,6 +905,7 @@ def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
     """Verifica los scripts de ejemplo sin enviar solicitudes a la red."""
     clave = "clave-local-de-prueba"
 
+    # Captura salida y sustituye HTTP para probar los scripts sin efectos externos.
     api_test = modulos["api_test"]
     respuesta = Mock()
     respuesta.text = '{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}'
@@ -985,6 +1008,7 @@ def _probar_api(reporte: Reporte, modulos: dict[str, object], clave: str) -> Non
         )
         return
     try:
+        # Esta es la única verificación del archivo que realiza una petición real.
         texto = modulos["consumir_gemini"].obtener_dato_de_prueba(
             "Responde únicamente: conexión correcta"
         )
@@ -1059,6 +1083,7 @@ def main() -> int:
 
     if modulos:
         print("\n4. PRUEBAS LOCALES (sin llamadas de red)")
+        # Se ejecutan únicamente si las importaciones funcionaron correctamente.
         _revisar_validaciones(reporte, modulos)
         _revisar_peticiones(reporte, modulos)
         _revisar_costo(reporte, modulos)
