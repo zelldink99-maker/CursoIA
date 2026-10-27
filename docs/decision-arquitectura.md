@@ -22,6 +22,14 @@ tokens reales y las tarifas de este documento. El costo de sesión no se guarda
 en disco. Los clientes anteriores conservan su comportamiento; la política de
 reintentos y el registro corresponden a la interfaz `consultar_modelo`.
 
+Las pruebas unitarias del cliente viven en `tests/test_cliente.py`. Usan
+`unittest.mock` para simular las respuestas HTTP y reemplazar las esperas, por
+lo que no llaman a Gemini ni esperan durante el backoff. `pytest` está declarado
+en `requirements.txt`; ejecuta `python -m pytest tests/test_cliente.py -v` desde
+la raíz para comprobar clasificación HTTP, reintentos, costos y la interfaz
+pública. El archivo también agrega la raíz del proyecto a `sys.path` y ejecuta
+pytest si se inicia directamente con `python tests/test_cliente.py`.
+
 El punto de entrada `python -m src.GATE_1.cliente` realiza una sola consulta de
 ejemplo. La función independiente `ejecutar_ensayo()` realiza diez consultas y
 muestra por cada respuesta exitosa el texto resumido, el total de tokens
