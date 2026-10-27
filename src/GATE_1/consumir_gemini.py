@@ -7,7 +7,6 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-
 # Mantiene la configuración independiente del directorio desde el que se ejecute.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = PROJECT_ROOT / ".env"
@@ -104,7 +103,9 @@ def obtener_dato_de_prueba(pregunta: str) -> str:
             timeout=REQUEST_TIMEOUT,
         )
     except requests.Timeout as error:
-        raise RuntimeError("La solicitud a Gemini superó el tiempo de espera.") from error
+        raise RuntimeError(
+            "La solicitud a Gemini superó el tiempo de espera."
+        ) from error
     except requests.ConnectionError as error:
         raise RuntimeError("No se pudo conectar con la API de Gemini.") from error
     except requests.RequestException as error:

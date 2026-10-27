@@ -98,6 +98,78 @@ El módulo `src/GATE_1/costo.py` calcula el costo a partir del uso reportado y
 los precios oficiales de Gemini 3.8 Flash. La tarifa utilizada y sus condiciones
 están documentadas en [la decisión de arquitectura](docs/decision-arquitectura.md#precios-oficiales-y-cálculo-de-costo).
 
+## Cliente modular: reintentos y costo por operación
+
+El cliente `src/GATE_1/cliente.py` ofrece `consultar_modelo(pregunta)` como
+interfaz única: valida y arma la solicitud, consulta Gemini, extrae el texto y
+registra el costo estimado de cada respuesta exitosa. La instrucción del sistema
+es opcional; si no se entrega, se usa una instrucción predeterminada no vacía,
+tal como exige el constructor de solicitudes del proyecto.
+
+El costo se calcula con los contadores reales de `usageMetadata` y las tarifas
+configuradas en `costo.py`: tokens de entrada al precio de entrada, y tokens de
+salida más los tokens de pensamiento (si Gemini los informa por separado) al
+precio de salida. Durante el ensayo de diez consultas se imprime el total de
+tokens reportado, el costo de cada operación y el acumulado. La ejecución de
+una sola consulta muestra la respuesta y el costo acumulado al final. Si faltan
+metadatos válidos, el cliente informa el error en vez de asignar un costo
+inventado. `costo_total_sesion` guarda el acumulado en memoria mientras el
+proceso está en ejecución; no se persiste en disco ni representa una factura.
+
+`src/GATE_1/cliente_reintento.py` reintenta errores transitorios (429, 5xx,
+timeout y conexión) hasta tres intentos totales por defecto. Entre intentos
+aplica backoff exponencial con jitter y un techo de 30 segundos por espera. Los
+mensajes de reintento indican el número de intento y la espera calculada. No
+reintenta errores de autenticación (401/403) ni otros errores HTTP permanentes.
+El envío conserva la clave en el encabezado y usa el timeout de 30 segundos de
+`monolitico.py`.
+
+### Una consulta
+
+Desde la raíz, ejecuta una consulta real. El bloque `__main__` llama una sola
+vez a `consultar_modelo`, imprime la respuesta y el costo acumulado:
+
+```console
+python -m src.GATE_1.cliente
+```
+
+También se puede ejecutar directamente el archivo:
+
+```console
+python src/GATE_1/cliente.py
+```
+
+### Ensayo de diez consultas
+
+Para ejecutar las diez preguntas de prueba (cada una puede generar costo), usa
+desde la raíz:
+
+```console
+python -c "from src.GATE_1.cliente import ejecutar_ensayo; raise SystemExit(ejecutar_ensayo())"
+```
+
+El ensayo imprime la respuesta resumida y, debajo, los tokens reportados, el
+costo de esa operación y el costo acumulado. Un fallo transitorio que agota
+los tres intentos se registra como fallo y el ensayo continúa con la pregunta
+siguiente. Un error permanente (por ejemplo, credenciales incorrectas o una
+solicitud HTTP inválida) se informa y detiene el ensayo. En el peor caso, diez
+preguntas podrían realizar hasta 30 solicitudes, además de las esperas entre
+reintentos.
+
+Los errores 401/403 se clasifican como problemas de credenciales y no se
+reintentan. Los errores 429, 5xx, timeout y conexión se consideran transitorios;
+al agotarse los intentos, `consultar_modelo` los comunica como
+`ServicioNoDisponibleError` (subclase de `RuntimeError`). Los demás errores HTTP,
+errores de configuración y respuestas inválidas se propagan con su tipo
+específico.
+
+Para comprobar la lógica sin llamadas de red, demoras ni costo de API, ejecuta
+el verificador local:
+
+```console
+python src/GATE_1/revision_gate_1.py --omitir-api
+```
+
 ## Revisar GATE_1
 
 Desde la raíz del repositorio ejecuta el verificador:
@@ -106,12 +178,13 @@ Desde la raíz del repositorio ejecuta el verificador:
 python src/GATE_1/revision_gate_1.py
 ```
 
-Describe los módulos `api_test`, `consumir_gemini`, `costo`, `latencia`,
-`main`, `module_test`, `monolitico` y `peticiones`; valida sintaxis,
-dependencias, imports y credenciales, y ejecuta pruebas locales simuladas.
-También comprueba por defecto la disponibilidad de Gemini con una petición
-real. Configura `GEMINI_API_KEY` en `.env` antes de ejecutarlo. La clave no se
-imprime; la prueba real puede generar un costo mínimo de API.
+Describe los módulos de GATE_1 y el banco de prompts; valida sintaxis,
+dependencias, imports y credenciales, y ejecuta pruebas locales simuladas,
+incluidas las de clasificación de errores, reintentos, backoff, costo por
+operación y formato del ensayo de diez preguntas. También comprueba por defecto
+la disponibilidad de Gemini con una petición real. Configura `GEMINI_API_KEY`
+en `.env` antes de ejecutarlo. La clave no se imprime; la prueba real puede
+generar un costo de API.
 Si Gemini no responde, revisa primero el estado HTTP antes de cambiar el
 modelo:
 
@@ -149,9 +222,11 @@ python src/GATE_1/revision_gate_1.py --omitir-api
 Los clientes de Gemini validan la configuración y las entradas antes de enviar
 solicitudes. `consumir_gemini.py` comunica errores de conexión, tiempo de espera,
 HTTP, JSON y formato de respuesta mediante excepciones explícitas; `monolitico.py`
-usa excepciones específicas derivadas de `GeminiError`. Los scripts de ejecución
-(`main.py`, `latencia.py` y `prompts/banco.py`) muestran los errores esperables
-al usuario y finalizan con un código distinto de cero.
+usa excepciones específicas derivadas de `GeminiError`. `cliente.py` convierte
+el agotamiento de errores transitorios en `ServicioNoDisponibleError`, que
+permite al ensayo continuar con la siguiente pregunta. El punto de entrada de
+una sola consulta y el ensayo devuelven un código distinto de cero cuando
+corresponde informar un fallo.
 
 Las operaciones locales también validan los casos inválidos: `dividir` genera
 `ZeroDivisionError` si el divisor es cero, `calcular_costo` genera `ValueError`

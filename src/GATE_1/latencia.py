@@ -83,7 +83,9 @@ class Latencia:
             self.precio_entrada,
             self.precio_salida,
         )
-        print(f"Costo estimado de la última petición ({MODELO_TARIFADO}): ${costo:.8f} USD")
+        print(
+            f"Costo estimado de la última petición ({MODELO_TARIFADO}): ${costo:.8f} USD"
+        )
         return latencia_promedio
 
 

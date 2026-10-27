@@ -103,7 +103,9 @@ def parsear_respuesta_json(texto: str) -> dict[str, object]:
     try:
         datos = json.loads(contenido)
     except json.JSONDecodeError as error:
-        raise ValueError(f"la respuesta no contiene JSON válido: {error.msg}") from error
+        raise ValueError(
+            f"la respuesta no contiene JSON válido: {error.msg}"
+        ) from error
 
     if not isinstance(datos, dict):
         raise ValueError("la respuesta JSON debe ser un objeto")
@@ -115,8 +117,10 @@ def es_consistente(
     intentos: int = INTENTOS_POR_PROMPT,
 ) -> bool:
     """Indica si todos los intentos produjeron la misma respuesta JSON válida."""
-    return intentos > 0 and len(respuestas) == intentos and all(
-        respuesta == respuestas[0] for respuesta in respuestas[1:]
+    return (
+        intentos > 0
+        and len(respuestas) == intentos
+        and all(respuesta == respuestas[0] for respuesta in respuestas[1:])
     )
 
 

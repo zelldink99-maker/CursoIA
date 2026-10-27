@@ -61,8 +61,11 @@ def calcular_costo(
         or precio < 0
         for precio in precios
     ):
-        raise ValueError("Los precios por token deben ser números finitos no negativos.")
+        raise ValueError(
+            "Los precios por token deben ser números finitos no negativos."
+        )
 
-    return tokens_entrada * precio_entrada + (
-        tokens_salida + tokens_pensamiento
-    ) * precio_salida
+    return (
+        tokens_entrada * precio_entrada
+        + (tokens_salida + tokens_pensamiento) * precio_salida
+    )
