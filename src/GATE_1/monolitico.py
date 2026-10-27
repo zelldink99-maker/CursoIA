@@ -95,9 +95,7 @@ def enviar_peticion(url, body):
         respuesta.raise_for_status()
     except requests.HTTPError as error:
         detalle = _detalle_error_http(respuesta)
-        raise GeminiHTTPError(
-            respuesta.status_code, detalle
-        ) from error
+        raise GeminiHTTPError(respuesta.status_code, detalle) from error
 
     try:
         datos = respuesta.json()
@@ -175,9 +173,7 @@ def extraer_metadatos_uso(datos: Any) -> dict[str, int]:
 
     metadatos = datos.get("usageMetadata")
     if not isinstance(metadatos, dict):
-        raise GeminiResponseError(
-            "Gemini no devolvió metadatos de uso de tokens."
-        )
+        raise GeminiResponseError("Gemini no devolvió metadatos de uso de tokens.")
 
     campos = ("promptTokenCount", "candidatesTokenCount", "totalTokenCount")
     if any(

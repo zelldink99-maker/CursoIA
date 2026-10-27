@@ -7,27 +7,12 @@ import requests
 
 def create_payload(prompt):
     """Serializa el prompt con la estructura de contenido que espera Gemini."""
-    return json.dumps(
-        {
-            "contents": [
-                {
-                    "parts": [
-                        {
-                            "text": prompt
-                        }
-                    ]
-                }
-            ]
-        }
-    )
+    return json.dumps({"contents": [{"parts": [{"text": prompt}]}]})
 
 
 def create_headers(api_key):
     """Crea los encabezados de autenticación y formato para la petición."""
-    return {
-        'x-goog-api-key': api_key,
-        'Content-Type': 'application/json'
-    }
+    return {"x-goog-api-key": api_key, "Content-Type": "application/json"}
 
 
 def make_request(url, headers, payload):

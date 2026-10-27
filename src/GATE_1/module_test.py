@@ -14,6 +14,7 @@ env_path = Path(__file__).resolve().parents[2] / ".env"
 # Mantiene el comportamiento del ejemplo: los valores del archivo prevalecen.
 load_dotenv(dotenv_path=env_path, override=True)
 
+
 def main() -> int:
     """Envía una pregunta de prueba con las funciones del módulo peticiones."""
     # Comprueba la configuración antes de construir o enviar la solicitud.

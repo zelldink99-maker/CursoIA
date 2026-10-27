@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Optional
 from unittest.mock import Mock, patch
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 GATE_DIR = Path(__file__).resolve().parent
 MODEL = "gemini-3.8-flash"
@@ -37,6 +36,14 @@ MODULES = {
     "consumir_gemini.py": (
         "Cliente robusto: valida la pregunta, configuración, HTTP y respuesta.",
         "Una pregunta válida devuelve texto; errores de API o configuración son explícitos.",
+    ),
+    "cliente.py": (
+        "Cliente modular con clasificación de errores y registro de costos.",
+        "Devuelve texto, reintenta fallos transitorios y acumula el costo por operación.",
+    ),
+    "cliente_reintento.py": (
+        "Controla reintentos con backoff exponencial, techo y jitter.",
+        "Solo repite TimeoutError y propaga el error al agotarse los intentos.",
     ),
     "costo.py": (
         "Calcula el costo estimado desde los tokens de entrada/salida y sus tarifas.",
@@ -85,11 +92,7 @@ class Reporte:
         """Registra una comprobación y muestra su estado en el reporte."""
         self.resultados.append((grupo, nombre, correcto, detalle))
         estado = (
-            "BIEN"
-            if correcto is True
-            else "MAL"
-            if correcto is False
-            else "OMITIDO"
+            "BIEN" if correcto is True else "MAL" if correcto is False else "OMITIDO"
         )
         print(f"  [{estado}] {nombre}: {detalle}")
 
@@ -117,6 +120,8 @@ def _importar_modulos() -> dict[str, object]:
     from src.GATE_1 import (
         api_test,
         aritmetica,
+        cliente,
+        cliente_reintento,
         consumir_gemini,
         costo,
         latencia,
@@ -130,6 +135,8 @@ def _importar_modulos() -> dict[str, object]:
     return {
         "api_test": api_test,
         "aritmetica": aritmetica,
+        "cliente": cliente,
+        "cliente_reintento": cliente_reintento,
         "consumir_gemini": consumir_gemini,
         "costo": costo,
         "latencia": latencia,
@@ -146,9 +153,11 @@ def _revisar_sintaxis(reporte: Reporte) -> None:
     archivos = [
         (
             nombre,
-            PROJECT_ROOT / nombre
-            if nombre.startswith("prompts/")
-            else GATE_DIR / nombre,
+            (
+                PROJECT_ROOT / nombre
+                if nombre.startswith("prompts/")
+                else GATE_DIR / nombre
+            ),
         )
         for nombre in MODULES
     ]
@@ -232,20 +241,27 @@ def _revisar_credenciales(reporte: Reporte) -> str:
     archivo_ignore = PROJECT_ROOT / ".gitignore"
     # git check-ignore confirma la regla efectiva, no solo el texto del .gitignore.
     try:
-        ignorado = subprocess.run(
-            ["git", "check-ignore", "--no-index", "--quiet", ".env"],
-            cwd=PROJECT_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        ).returncode == 0
+        ignorado = (
+            subprocess.run(
+                ["git", "check-ignore", "--no-index", "--quiet", ".env"],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            ).returncode
+            == 0
+        )
     except OSError:
         ignorado = False
     reporte.agregar(
         "Credenciales no expuestas",
         ".env excluido por Git",
         ignorado and archivo_ignore.is_file(),
-        "Git ignora .env" if ignorado else ".env no está confirmado como ignorado por Git",
+        (
+            "Git ignora .env"
+            if ignorado
+            else ".env no está confirmado como ignorado por Git"
+        ),
     )
 
     # Busca patrones de claves incrustadas en los scripts de este Gate.
@@ -262,9 +278,11 @@ def _revisar_credenciales(reporte: Reporte) -> str:
         "Credenciales no expuestas",
         "Sin claves literales en scripts",
         not clave_en_codigo,
-        "no se encontraron claves incrustadas"
-        if not clave_en_codigo
-        else "se encontró una posible clave API en un archivo .py",
+        (
+            "no se encontraron claves incrustadas"
+            if not clave_en_codigo
+            else "se encontró una posible clave API en un archivo .py"
+        ),
     )
 
     valor = os.getenv("GEMINI_API_KEY", "").strip()
@@ -325,14 +343,18 @@ def _revisar_peticiones(reporte: Reporte, modulos: dict[str, object]) -> None:
         and request.call_args.kwargs["data"] == peticiones.create_payload(prompt)
         and resultado_error.startswith("Error:")
     )
-    correcto = cuerpo_ok and headers.get("x-goog-api-key") == "clave-de-prueba" and request_ok
+    correcto = (
+        cuerpo_ok and headers.get("x-goog-api-key") == "clave-de-prueba" and request_ok
+    )
     reporte.agregar(
         "peticiones.py",
         "Cuerpo, encabezado y envío simulados",
         correcto,
-        "la solicitud usa encabezado seguro y comunica errores de conexión"
-        if correcto
-        else "falló la comprobación del cuerpo, encabezado, envío o error HTTP",
+        (
+            "la solicitud usa encabezado seguro y comunica errores de conexión"
+            if correcto
+            else "falló la comprobación del cuerpo, encabezado, envío o error HTTP"
+        ),
     )
 
 
@@ -355,9 +377,7 @@ def _revisar_costo(reporte: Reporte, modulos: dict[str, object]) -> None:
         and modulos["costo"].PRECIO_ENTRADA_USD_POR_MILLON == 0.75
         and modulos["costo"].PRECIO_SALIDA_USD_POR_MILLON == 3.75
     )
-    url, _ = modulos["monolitico"].armar_peticion(
-        "prueba", "Responde brevemente."
-    )
+    url, _ = modulos["monolitico"].armar_peticion("prueba", "Responde brevemente.")
     modelo_solicitud_ok = modulos["costo"].MODELO_TARIFADO in url
     reporte.agregar(
         "costo.py",
@@ -412,9 +432,11 @@ def _revisar_validaciones(reporte: Reporte, modulos: dict[str, object]) -> None:
         "Validación de errores",
         "Entradas inválidas en módulos locales",
         correcto,
-        "división, metadatos, latencia y JSON rechazan entradas inválidas"
-        if correcto
-        else "una o más entradas inválidas no se rechazaron explícitamente",
+        (
+            "división, metadatos, latencia y JSON rechazan entradas inválidas"
+            if correcto
+            else "una o más entradas inválidas no se rechazaron explícitamente"
+        ),
     )
 
 
@@ -422,7 +444,11 @@ def _revisar_cliente(reporte: Reporte, modulos: dict[str, object]) -> None:
     """Comprueba extracción de texto y rechazo de preguntas vacías localmente."""
     cliente = modulos["consumir_gemini"]
     texto = cliente._extraer_texto(
-        {"candidates": [{"content": {"parts": [{"text": "respuesta"}, {"text": " lista"}]}}]}
+        {
+            "candidates": [
+                {"content": {"parts": [{"text": "respuesta"}, {"text": " lista"}]}}
+            ]
+        }
     )
     formato_ok = texto == "respuesta lista"
     try:
@@ -436,9 +462,234 @@ def _revisar_cliente(reporte: Reporte, modulos: dict[str, object]) -> None:
         "consumir_gemini.py",
         "Validación local de respuesta",
         correcto,
-        "concatena el texto y rechaza preguntas vacías"
-        if correcto
-        else "no coincide el texto extraído o no rechaza pregunta vacía",
+        (
+            "concatena el texto y rechaza preguntas vacías"
+            if correcto
+            else "no coincide el texto extraído o no rechaza pregunta vacía"
+        ),
+    )
+
+
+def _revisar_cliente_modular(reporte: Reporte, modulos: dict[str, object]) -> None:
+    """Comprueba consulta, clasificación HTTP, backoff y costos sin usar la red."""
+    cliente = modulos["cliente"]
+    reintentos = modulos["cliente_reintento"]
+    respuesta = {
+        "candidates": [
+            {"content": {"parts": [{"text": "Santiago es la capital de Chile."}]}}
+        ],
+        "usageMetadata": {
+            "promptTokenCount": 100,
+            "candidatesTokenCount": 20,
+            "totalTokenCount": 120,
+        },
+    }
+
+    with patch.object(cliente, "costo_total_sesion", 0.0):
+        with patch.object(cliente.monolitico, "enviar_peticion", return_value=respuesta):
+            texto = cliente.consultar_modelo("¿Cuál es la capital de Chile?")
+        costo_esperado = cliente.calcular_costo(respuesta)
+        costo_acumulado_ok = abs(cliente.costo_total_sesion - costo_esperado) < 1e-12
+
+        credencial_rechazada = True
+        credencial_sin_reintento = True
+        for codigo in (401, 403):
+            with patch.object(
+                cliente.monolitico,
+                "enviar_peticion",
+                side_effect=cliente.monolitico.GeminiHTTPError(
+                    codigo, "sin permiso"
+                ),
+            ) as solicitud:
+                try:
+                    cliente.consultar_modelo("pregunta")
+                except ValueError as error:
+                    credencial_rechazada &= "GEMINI_API_KEY" in str(error)
+                else:
+                    credencial_rechazada = False
+            credencial_sin_reintento &= solicitud.call_count == 1
+
+        with patch.object(
+            cliente.monolitico,
+            "enviar_peticion",
+            side_effect=[
+                cliente.monolitico.GeminiHTTPError(429, "límite"),
+                respuesta,
+            ],
+        ) as solicitud:
+            with patch.object(reintentos.time, "sleep") as dormir:
+                with patch.object(reintentos.random, "uniform", return_value=0.0):
+                    texto_reintentado = cliente.consultar_modelo("pregunta")
+        rate_limit_reintentado = (
+            solicitud.call_count == 2
+            and dormir.call_count == 1
+            and texto_reintentado == "Santiago es la capital de Chile."
+        )
+
+        with patch.object(
+            cliente.monolitico,
+            "enviar_peticion",
+            side_effect=cliente.monolitico.GeminiHTTPError(400, "solicitud inválida"),
+        ) as solicitud:
+            try:
+                cliente.consultar_modelo("pregunta")
+            except cliente.monolitico.GeminiHTTPError:
+                error_permanente_no_reintentado = solicitud.call_count == 1
+            else:
+                error_permanente_no_reintentado = False
+
+        with patch.object(
+            cliente.monolitico,
+            "enviar_peticion",
+            side_effect=[
+                cliente.monolitico.GeminiHTTPError(503, "servicio ocupado"),
+                respuesta,
+            ],
+        ) as solicitud:
+            with patch.object(reintentos.time, "sleep") as dormir:
+                with patch.object(reintentos.random, "uniform", return_value=0.0):
+                    texto_503 = cliente.consultar_modelo("pregunta")
+        servicio_transitorio_reintentado = (
+            solicitud.call_count == 2
+            and dormir.call_count == 1
+            and texto_503 == "Santiago es la capital de Chile."
+        )
+
+        errores_red_reintentados = True
+        for error_red in (
+            cliente.monolitico.GeminiTimeoutError("timeout simulado"),
+            cliente.monolitico.GeminiConnectionError("conexión simulada"),
+        ):
+            with patch.object(
+                cliente.monolitico,
+                "enviar_peticion",
+                side_effect=[error_red, respuesta],
+            ) as solicitud:
+                with patch.object(reintentos.time, "sleep"):
+                    with patch.object(
+                        reintentos.random, "uniform", return_value=0.0
+                    ):
+                        resultado_red = cliente.consultar_modelo("pregunta")
+            errores_red_reintentados &= (
+                solicitud.call_count == 2
+                and resultado_red == "Santiago es la capital de Chile."
+            )
+
+        with patch.object(
+            cliente,
+            "_enviar_peticion_reintentable",
+            side_effect=TimeoutError("fallo transitorio"),
+        ) as enviar:
+            with patch.object(reintentos.time, "sleep"):
+                with patch.object(reintentos.random, "uniform", return_value=0.0):
+                    try:
+                        cliente.consultar_modelo("pregunta")
+                    except RuntimeError as error:
+                        reintentos_agotados = "varios intentos" in str(error)
+                    else:
+                        reintentos_agotados = False
+        intentos_agotados_correctos = enviar.call_count == 3
+
+    with patch.object(reintentos.time, "sleep") as dormir:
+        with patch.object(
+            reintentos.random,
+            "uniform",
+            side_effect=lambda minimo, maximo: maximo,
+        ):
+            intentos_backoff = 0
+
+            def operacion_transitoria() -> str:
+                nonlocal intentos_backoff
+                intentos_backoff += 1
+                if intentos_backoff < 4:
+                    raise TimeoutError("fallo simulado")
+                return "ok"
+
+            resultado_backoff = reintentos.con_reintento(
+                operacion_transitoria,
+                intentos=4,
+                espera_base=2,
+                espera_maxima=5,
+            )
+    esperas = [llamada.args[0] for llamada in dormir.call_args_list]
+    backoff_correcto = (
+        resultado_backoff == "ok"
+        and esperas == [2.2, 4.4, 5.0]
+        and max(esperas) <= 5
+    )
+
+    with patch.object(
+        cliente,
+        "consultar_modelo",
+        side_effect=cliente.ServicioNoDisponibleError("fallo simulado"),
+    ):
+        with redirect_stderr(StringIO()) as salida_error:
+            codigo_error = cliente.main()
+    manejo_error_publico = (
+        codigo_error == 1 and "fallo simulado" in salida_error.getvalue()
+    )
+
+    with patch.object(cliente, "costo_total_sesion", 0.00008):
+        with patch.object(cliente, "consultar_modelo", return_value="Santiago") as consulta:
+            with redirect_stdout(StringIO()) as salida_principal:
+                codigo_principal = cliente.main()
+    bloque_principal_correcto = (
+        codigo_principal == 0
+        and consulta.call_count == 1
+        and "Santiago" in salida_principal.getvalue()
+        and "Costo acumulado de la sesión: $0.00008" in salida_principal.getvalue()
+    )
+
+    def consulta_ensayo_simulada(pregunta: str) -> str:
+        """Registra uso simulado igual que una respuesta válida del proveedor."""
+        cliente.registrar_costo(respuesta)
+        return f"Respuesta simulada para {pregunta}, con texto adicional."
+
+    with patch.object(
+        cliente,
+        "consultar_modelo",
+        side_effect=consulta_ensayo_simulada,
+    ) as consultar:
+        with redirect_stdout(StringIO()) as salida_ensayo:
+            codigo_ensayo = cliente.ejecutar_ensayo()
+    lineas_ensayo = salida_ensayo.getvalue()
+    ensayo_de_diez_correcto = (
+        codigo_ensayo == 0
+        and consultar.call_count == 10
+        and "Respuesta 0:" in lineas_ensayo
+        and "Respuesta 9:" in lineas_ensayo
+        and "120 tokens, costo estimado: $0.00015" in lineas_ensayo
+        and "(acumulado: $0.00150)" in lineas_ensayo
+        and "Costo total del ensayo: $0.00150" in lineas_ensayo
+    )
+
+    correcto = all(
+        (
+            texto == "Santiago es la capital de Chile.",
+            costo_acumulado_ok,
+            credencial_rechazada,
+            credencial_sin_reintento,
+            rate_limit_reintentado,
+            error_permanente_no_reintentado,
+            servicio_transitorio_reintentado,
+            errores_red_reintentados,
+            reintentos_agotados,
+            intentos_agotados_correctos,
+            backoff_correcto,
+            manejo_error_publico,
+            bloque_principal_correcto,
+            ensayo_de_diez_correcto,
+        )
+    )
+    reporte.agregar(
+        "cliente modular",
+        "Errores, backoff y costos simulados",
+        correcto,
+        (
+            "clasifica HTTP, aplica backoff acotado y registra costos reales"
+            if correcto
+            else "falló una comprobación de consulta, reintentos, techo o costo"
+        ),
     )
 
 
@@ -458,9 +709,7 @@ def _revisar_monolitico(reporte: Reporte, modulos: dict[str, object]) -> None:
             },
         }
         respuesta.json.return_value = respuesta_json
-        with patch.object(
-            monolitico.requests, "post", return_value=respuesta
-        ) as post:
+        with patch.object(monolitico.requests, "post", return_value=respuesta) as post:
             resultado = monolitico.enviar_peticion(url, body)
     llamada = post.call_args
     correcto = (
@@ -475,15 +724,15 @@ def _revisar_monolitico(reporte: Reporte, modulos: dict[str, object]) -> None:
         "monolitico.py",
         "Autenticación segura y respuesta simulada",
         correcto,
-        "la clave no aparece en la URL y se envía en el encabezado"
-        if correcto
-        else "la clave podría exponerse o la petición no cumplió lo esperado",
+        (
+            "la clave no aparece en la URL y se envía en el encabezado"
+            if correcto
+            else "la clave podría exponerse o la petición no cumplió lo esperado"
+        ),
     )
 
     respuesta_demo = {
-        "candidates": [
-            {"content": {"parts": [{"text": "respuesta de prueba"}]}}
-        ],
+        "candidates": [{"content": {"parts": [{"text": "respuesta de prueba"}]}}],
         "usageMetadata": {
             "promptTokenCount": 12,
             "candidatesTokenCount": 48,
@@ -504,9 +753,11 @@ def _revisar_monolitico(reporte: Reporte, modulos: dict[str, object]) -> None:
         "monolitico.py",
         "Presentación de tokens de respuesta",
         demo_ok,
-        "muestra tokens de entrada, salida y total"
-        if demo_ok
-        else "no se mostraron correctamente los metadatos de tokens",
+        (
+            "muestra tokens de entrada, salida y total"
+            if demo_ok
+            else "no se mostraron correctamente los metadatos de tokens"
+        ),
     )
 
     try:
@@ -519,9 +770,11 @@ def _revisar_monolitico(reporte: Reporte, modulos: dict[str, object]) -> None:
         "monolitico.py",
         "Validación de metadatos de tokens",
         metadata_ausente_rechazada,
-        "informa explícitamente cuando falta usageMetadata"
-        if metadata_ausente_rechazada
-        else "no se rechazaron los metadatos de uso ausentes",
+        (
+            "informa explícitamente cuando falta usageMetadata"
+            if metadata_ausente_rechazada
+            else "no se rechazaron los metadatos de uso ausentes"
+        ),
     )
 
 
@@ -574,15 +827,15 @@ def _revisar_banco_prompts(reporte: Reporte, modulos: dict[str, object]) -> None
         ejemplos_ok = ejemplos_ok and (
             "/models/" in url_ejemplo
             and ":generateContent" in url_ejemplo
-            and cuerpo_ejemplo["contents"][0]["parts"][0]["text"]
-            == pregunta_ejemplo
+            and cuerpo_ejemplo["contents"][0]["parts"][0]["text"] == pregunta_ejemplo
             and cuerpo_ejemplo["systemInstruction"]["parts"][0]["text"]
             == instruccion_ejemplo
             and cuerpo_ejemplo["generationConfig"]["responseMimeType"]
             == "application/json"
-            and cuerpo_ejemplo["generationConfig"]["responseSchema"]
-            == esquema_ejemplo
-            and all(clave in propiedades_ejemplo for clave in ejemplo["claves_esperadas"])
+            and cuerpo_ejemplo["generationConfig"]["responseSchema"] == esquema_ejemplo
+            and all(
+                clave in propiedades_ejemplo for clave in ejemplo["claves_esperadas"]
+            )
         )
 
     prompt = {
@@ -618,9 +871,11 @@ def _revisar_banco_prompts(reporte: Reporte, modulos: dict[str, object]) -> None
         "prompts/banco.py",
         "Validación y preparación local",
         correcto,
-        "valida JSON, construye la solicitud y contiene tres ejemplos"
-        if correcto
-        else "falló la validación JSON, la solicitud o el banco de tres ejemplos",
+        (
+            "valida JSON, construye la solicitud y contiene tres ejemplos"
+            if correcto
+            else "falló la validación JSON, la solicitud o el banco de tres ejemplos"
+        ),
     )
 
 
@@ -644,9 +899,11 @@ def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
         "api_test.py",
         "Resultado HTTP simulado",
         api_ok,
-        "imprime éxito solo después de una respuesta HTTP correcta"
-        if api_ok
-        else "no informó correctamente la respuesta simulada",
+        (
+            "imprime éxito solo después de una respuesta HTTP correcta"
+            if api_ok
+            else "no informó correctamente la respuesta simulada"
+        ),
     )
 
     modulo_test = modulos["module_test"]
@@ -665,9 +922,11 @@ def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
         "module_test.py",
         "Envío de módulo simulado",
         modulo_ok,
-        "envía la clave en el encabezado y muestra la respuesta"
-        if modulo_ok
-        else "falló la llamada simulada del módulo",
+        (
+            "envía la clave en el encabezado y muestra la respuesta"
+            if modulo_ok
+            else "falló la llamada simulada del módulo"
+        ),
     )
 
     modulo_main = modulos["main"]
@@ -685,9 +944,11 @@ def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
         "main.py",
         "Demostración simulada",
         main_ok,
-        "suma 5 + 3 y muestra la respuesta de Gemini"
-        if main_ok
-        else "la suma o el resultado de demostración no coincide",
+        (
+            "suma 5 + 3 y muestra la respuesta de Gemini"
+            if main_ok
+            else "la suma o el resultado de demostración no coincide"
+        ),
     )
 
     with patch.object(
@@ -699,17 +960,19 @@ def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
             with redirect_stderr(StringIO()) as errores:
                 codigo_main_error = modulo_main.main()
     main_error_ok = (
-        codigo_main_error == 1
-        and "fallo local simulado" in errores.getvalue()
+        codigo_main_error == 1 and "fallo local simulado" in errores.getvalue()
     )
     reporte.agregar(
         "main.py",
         "Manejo de error del cliente",
         main_error_ok,
-        "muestra el fallo esperado en stderr y devuelve código 1"
-        if main_error_ok
-        else "no comunicó correctamente el error del cliente",
+        (
+            "muestra el fallo esperado en stderr y devuelve código 1"
+            if main_error_ok
+            else "no comunicó correctamente el error del cliente"
+        ),
     )
+
 
 def _probar_api(reporte: Reporte, modulos: dict[str, object], clave: str) -> None:
     """Hace una petición real para comprobar disponibilidad y redacta la clave."""
@@ -734,9 +997,11 @@ def _probar_api(reporte: Reporte, modulos: dict[str, object], clave: str) -> Non
             "API funciona",
             "Prueba real de Gemini",
             correcto,
-            f"se recibió una respuesta de {len(texto)} caracteres"
-            if correcto
-            else "Gemini respondió sin texto",
+            (
+                f"se recibió una respuesta de {len(texto)} caracteres"
+                if correcto
+                else "Gemini respondió sin texto"
+            ),
         )
 
 
@@ -798,6 +1063,7 @@ def main() -> int:
         _revisar_peticiones(reporte, modulos)
         _revisar_costo(reporte, modulos)
         _revisar_cliente(reporte, modulos)
+        _revisar_cliente_modular(reporte, modulos)
         _revisar_monolitico(reporte, modulos)
         _revisar_latencia(reporte, modulos)
         _revisar_banco_prompts(reporte, modulos)
@@ -809,7 +1075,10 @@ def main() -> int:
             _probar_api(reporte, modulos, clave)
         else:
             reporte.agregar(
-                "API funciona", "Prueba real de Gemini", False, "no se importó el cliente"
+                "API funciona",
+                "Prueba real de Gemini",
+                False,
+                "no se importó el cliente",
             )
     else:
         reporte.agregar(
@@ -827,7 +1096,9 @@ def main() -> int:
         "Código ejecutable",
     ):
         estado = reporte.estado_grupo(grupo)
-        etiqueta = "BIEN" if estado is True else "MAL" if estado is False else "PENDIENTE"
+        etiqueta = (
+            "BIEN" if estado is True else "MAL" if estado is False else "PENDIENTE"
+        )
         print(f"- [{etiqueta}] {grupo}")
 
     print("\nLas claves API nunca se imprimen.")
