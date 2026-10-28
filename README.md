@@ -1,252 +1,268 @@
-﻿# Curso IA - Tareas / Gate 1
+﻿# Plantilla de repositorio base — Especialización en Desarrollo con IA Generativa (Accenture)
 
-Proyecto de laboratorio para trabajar con la API de Gemini, validación de prompts, cálculo de costos y manejo robusto de errores en consultas con IA.
+<p align="center">
+  <img src="docs/IA.jpg" alt="Inteligencia artificial aplicada al desarrollo" width="800">
+</p>
 
-## Descripción general
+Esta es la estructura base del proyecto para la Especialización en Desarrollo
+con IA Generativa. Se irá ampliando bloque a bloque hasta llegar a la
+aplicación completa del Gate 3. En este repositorio se practica el envío de
+preguntas a la API de Gemini, la medición de latencia, la estimación del costo
+de los tokens de una respuesta y la validación local de módulos auxiliares del
+proyecto.
 
-Este repositorio funciona como base práctica para integrar modelos generativos con Python, evaluar respuestas estructuradas, medir latencia y estimar el coste de cada operación. Está pensado para aprender de forma modular: cada archivo resuelve un bloque del flujo con Gemini y facilita ver cómo se valida, se prueba y se documenta una solución real.
+## Cómo empezar
 
-Incluye:
-- consultas directas a Gemini;
-- validación de campos, respuestas y errores HTTP;
-- reintentos por errores transitorios;
-- estimación del costo por uso de tokens;
-- pruebas de salida estructurada con prompts JSON;
-- limpieza, tokenización y comparación de texto para evaluar resultados.
+Después de clonar el repositorio o descomprimir el proyecto, abre una terminal
+en la carpeta raíz. Usa Python 3.10 o superior y crea un entorno virtual para
+instalar las dependencias sin modificar la instalación global de Python.
 
-## Objetivos del proyecto
+### Linux
 
-- entender cómo autenticar y consumir la API de Gemini desde Python;
-- validar la pregunta, la respuesta y los metadatos del proveedor;
-- manejar errores de conexión, timeout, autenticación y respuestas inválidas;
-- medir tiempos de respuesta y estimar costos por operación;
-- evaluar la consistencia y calidad de las salidas del modelo;
-- revisar el proyecto con una validación automatizada del Gate 1.
+En Debian o Ubuntu, si la creación del entorno virtual falla porque no está
+instalado el módulo `venv`, instálalo con `sudo apt install python3-venv`.
+Luego ejecuta:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+```
+
+En otras distribuciones, instala el paquete de `venv` correspondiente a tu
+versión de Python si fuera necesario.
+
+### macOS
+
+Comprueba que Python 3 esté disponible con `python3 --version`. Si no lo está,
+instálalo desde [python.org](https://www.python.org/downloads/macos/) o con
+Homebrew (`brew install python`). Después ejecuta:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+```
+
+### Windows (PowerShell)
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+En todos los sistemas, edita `.env` y reemplaza `tu_llave_aqui` por tu clave
+real de Gemini. No compartas ni subas ese archivo: `.gitignore` lo excluye.
+Cuando termines de trabajar, puedes salir del entorno virtual con `deactivate`.
+
+> **Importante:** no instales paquetes con `pip install dotenv` ni directamente
+en el Python del sistema. Este proyecto necesita `python-dotenv` (declarado
+en `requirements.txt`), y la instalación debe hacerse con el entorno virtual
+activado mediante `python -m pip install -r requirements.txt`. Esto también
+evita el error `externally-managed-environment` de distribuciones Linux que
+aplican PEP 668.
 
 ## Requisitos
 
 - Python 3.10 o superior.
-- Variable de entorno `GEMINI_API_KEY` con una clave válida.
-- Conexión a Internet para ejecutar consultas reales.
-- Entorno virtual recomendado para aislar dependencias.
+- Una clave de API de Gemini.
+- Conexión a internet para consultar la API real.
 
-## Estructura del proyecto
+## Medir latencia y costo
 
-```text
-.
-├── .env.example
-├── .gitignore
-├── README.md
-├── requirements.txt
-├── docs/
-│   ├── decision-arquitectura.md
-│   ├── IA.jpg
-│   └── registro_resultados.txt
-├── prompts/
-│   ├── banco.py
-│   └── registro_resultados.json
-├── src/
-│   └── GATE_1/
-│       ├── api_test.py
-│       ├── aritmetica.py
-│       ├── cliente.py
-│       ├── cliente_reintento.py
-│       ├── consumir_gemini.py
-│       ├── costo.py
-│       ├── evaluar_salidas.py
-│       ├── latencia.py
-│       ├── main.py
-│       ├── module_test.py
-│       ├── monolitico.py
-│       ├── peticiones.py
-│       ├── pipeline_texto.py
-│       ├── revision_gate_1.py
-│       ├── test.py
-│       └── ...
-├── tests/
-│   ├── test_cliente.py
-│   └── test_pipeline_texto.py
-├── venv/
-└── .pytest_cache/
+Desde la raíz del repositorio ejecuta:
+
+```console
+python src/GATE_1/latencia.py
 ```
 
-## Configuración inicial
+La clase `Latencia`, definida en `src/GATE_1/latencia.py`, realiza cuatro
+solicitudes con la pregunta de prueba predeterminada. Informa el tiempo de cada
+solicitud, el promedio y una estimación del costo de la última respuesta usando
+el precio oficial vigente de Gemini 3.8 Flash. Ejecuta el archivo directamente
+como se muestra; no uses `-m src.GATE_1.latencia`, ya que sus imports de módulos
+hermanos no están configurados para la ejecución como módulo de paquete.
 
-1. Clona o descarga el repositorio.
-2. Crea un entorno virtual desde la raíz:
+## Consultar tokens de una respuesta
 
-```bash
-python -m venv .venv
+La respuesta JSON de Gemini se conserva completa al volver de
+`enviar_peticion`; además del contenido generado puede incluir `usageMetadata`
+con los tokens de entrada, salida y total. Al ejecutar
+`python src/GATE_1/monolitico.py`, el ejemplo imprime la respuesta y esos tres
+contadores. El programa informa un error explícito si la API no incluye
+metadatos de tokens válidos.
+
+El módulo `src/GATE_1/costo.py` calcula el costo a partir del uso reportado y
+los precios oficiales de Gemini 3.8 Flash. La tarifa utilizada y sus condiciones
+están documentadas en [la decisión de arquitectura](docs/decision-arquitectura.md#precios-oficiales-y-cálculo-de-costo).
+
+## Cliente modular: reintentos y costo por operación
+
+El cliente `src/GATE_1/cliente.py` ofrece `consultar_modelo(pregunta)` como
+interfaz única: valida y arma la solicitud, consulta Gemini, extrae el texto y
+registra el costo estimado de cada respuesta exitosa. La instrucción del sistema
+es opcional; si no se entrega, se usa una instrucción predeterminada no vacía,
+tal como exige el constructor de solicitudes del proyecto.
+
+El costo se calcula con los contadores reales de `usageMetadata` y las tarifas
+configuradas en `costo.py`: tokens de entrada al precio de entrada, y tokens de
+salida más los tokens de pensamiento (si Gemini los informa por separado) al
+precio de salida. Durante el ensayo de diez consultas se imprime el total de
+tokens reportado, el costo de esa operación y el acumulado. La ejecución de
+una sola consulta muestra la respuesta y el costo acumulado al final. Si faltan
+metadatos válidos, el cliente informa el error en vez de asignar un costo
+inventado. `costo_total_sesion` guarda el acumulado en memoria mientras el
+proceso está en ejecución; no se persiste en disco ni representa una factura.
+
+`src/GATE_1/cliente_reintento.py` reintenta errores transitorios (429, 5xx,
+timeout y conexión) hasta tres intentos totales por defecto. Entre intentos
+aplica backoff exponencial con jitter y un techo de 30 segundos por espera. Los
+mensajes de reintento indican el número de intento y la espera calculada. No
+reintenta errores de autenticación (401/403) ni otros errores HTTP permanentes.
+El envío conserva la clave en el encabezado y usa el timeout de 30 segundos de
+`monolitico.py`.
+
+### Una consulta
+
+Desde la raíz, ejecuta una consulta real. El bloque `__main__` llama una sola
+vez a `consultar_modelo`, imprime la respuesta y el costo acumulado:
+
+```console
+python -m src.GATE_1.cliente
 ```
 
-3. Activa el entorno:
+También se puede ejecutar directamente el archivo:
 
-- Linux/macOS:
-
-```bash
-source .venv/bin/activate
-```
-
-- Windows (PowerShell):
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-4. Instala las dependencias:
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-5. Genera tu archivo local de entorno:
-
-```bash
-cp .env.example .env
-```
-
-En PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-6. Edita `.env` y reemplaza `tu_llave_aqui` por tu clave real:
-
-```env
-GEMINI_API_KEY=tu_clave_real
-```
-
-> El archivo `.env` no debe compartirse ni subirse al repositorio. Ya está excluido en `.gitignore`.
-
-## Ejecución rápida
-
-### 1. Demostración simple
-
-```bash
-python src/GATE_1/main.py
-```
-
-Ejecuta una suma local y una consulta de ejemplo a Gemini.
-
-### 2. Consulta directa a la API
-
-```bash
-python src/GATE_1/consumir_gemini.py
-```
-
-### 3. Cliente modular con reintentos y costos
-
-```bash
+```console
 python src/GATE_1/cliente.py
 ```
 
-### 4. Ensayo con varias consultas
+### Ensayo de diez consultas
 
-```bash
+Para ejecutar las diez preguntas de prueba (cada una puede generar costo), usa
+desde la raíz:
+
+```console
 python -c "from src.GATE_1.cliente import ejecutar_ensayo; raise SystemExit(ejecutar_ensayo())"
 ```
 
-Este comando ejecuta varias consultas y muestra el costo acumulado de la sesión y los reintentos si la API responde con errores transitorios.
+El ensayo imprime la respuesta resumida y, debajo, los tokens reportados, el
+costo de esa operación y el costo acumulado. Un fallo transitorio que agota
+los tres intentos se registra como fallo y el ensayo continúa con la pregunta
+siguiente. Un error permanente (por ejemplo, credenciales incorrectas o una
+solicitud HTTP inválida) se informa y detiene el ensayo. En el peor caso, diez
+preguntas podrían realizar hasta 30 solicitudes, además de las esperas entre
+reintentos.
 
-### 5. Banco de prompts
+Los errores 401/403 se clasifican como problemas de credenciales y no se
+reintentan. Los errores 429, 5xx, timeout y conexión se consideran transitorios;
+al agotarse los intentos, `consultar_modelo` los comunica como
+`ServicioNoDisponibleError` (subclase de `RuntimeError`). Los demás errores HTTP,
+errores de configuración y respuestas inválidas se propagan con su tipo
+específico.
 
-```bash
-python prompts/banco.py
-```
+Para comprobar la lógica interna del cliente sin llamadas de red, demoras ni
+costo de API, ejecuta las pruebas unitarias con pytest:
 
-El banco valida respuestas JSON estructuradas y guarda un resumen en `prompts/registro_resultados.json`.
-
-## Modelo y costos
-
-El proyecto usa el modelo `gemini-3.8-flash` y estima el coste de cada operación usando los metadatos reales de uso reportados por Gemini (`usageMetadata`).
-
-El cálculo de costo está en:
-
-- [src/GATE_1/costo.py](src/GATE_1/costo.py)
-- [docs/decision-arquitectura.md](docs/decision-arquitectura.md)
-
-La estimación se basa en precios oficiales y sirve como medida local de la operación; no reemplaza la facturación exacta del proveedor.
-
-## Pipeline de texto y evaluación de salidas
-
-Además de la consulta a Gemini, el proyecto incluye herramientas para tratamiento y comparación de texto:
-
-- [src/GATE_1/pipeline_texto.py](src/GATE_1/pipeline_texto.py): limpia texto, elimina puntuación y espacios extra, tokeniza y cuenta frecuencias.
-- [src/GATE_1/evaluar_salidas.py](src/GATE_1/evaluar_salidas.py): compara la salida del modelo con una referencia usando métricas de texto crudo y texto normalizado.
-
-### Validación del pipeline
-
-```bash
-python -m pytest tests/test_pipeline_texto.py -q
-```
-
-Esto valida limpieza, tokenización, conteo de frecuencias y comparación de coincidencias sin llamadas reales a la API.
-
-## Validación del proyecto
-
-### Pruebas unitarias del cliente
-
-```bash
+```console
 python -m pytest tests/test_cliente.py -v
 ```
 
-Estas pruebas simulan la API y validan:
-- clasificación de errores HTTP;
-- reintentos con backoff exponencial;
-- costo por operación y acumulado de sesión;
-- manejo de errores de autenticación;
-- criterios de validación de entradas y salidas.
+También puedes ejecutar el archivo de pruebas directamente; prepara la ruta
+del proyecto y lanza pytest automáticamente:
 
-### Revisión general del Gate 1
+```console
+python tests/test_cliente.py
+```
 
-```bash
+La suite usa mocks para la API y el tiempo. Cubre clasificación HTTP, el camino
+feliz, reintentos, agotamiento, validación y acumulación de costos y manejo de
+errores del cliente. El paquete `pytest` está declarado en `requirements.txt`;
+instala o actualiza el entorno con:
+
+```console
+python -m pip install -r requirements.txt
+```
+
+El verificador general local también ejecuta comprobaciones simuladas:
+
+```console
 python src/GATE_1/revision_gate_1.py --omitir-api
 ```
 
-Este verificador valida:
-- sintaxis de los módulos;
-- importaciones del paquete;
-- dependencias e instalación del entorno;
-- configuración de credenciales;
-- pruebas simuladas sin llamadas reales a la API;
-- nuevos módulos agregados al proyecto.
+## Pipeline de texto y evaluación de salidas
 
-También puedes ejecutar la revisión completa con autenticación real:
+Además de la consulta a Gemini, el proyecto incluye un flujo local para limpiar,
+comparar y evaluar texto antes de interpretar la respuesta del modelo:
 
-```bash
+- `src/GATE_1/pipeline_texto.py`: limpia el texto, elimina puntuación y espacios
+  extra, tokeniza y genera un conteo de frecuencias por palabra.
+- `src/GATE_1/evaluar_salidas.py`: compara la respuesta del modelo con una
+  referencia usando métricas sobre texto crudo y texto normalizado.
+
+Estas funciones sirven para detectar coincidencias de contenido y validar que
+las respuestas del modelo tengan un formato usable, sin depender de llamadas a
+la API real durante el desarrollo local.
+
+Para ejecutarlas en pruebas locales:
+
+```console
+python -m pytest tests/test_pipeline_texto.py -q
+```
+
+## Revisar GATE_1
+
+Desde la raíz del repositorio ejecuta el verificador:
+
+```console
 python src/GATE_1/revision_gate_1.py
 ```
 
-## Módulos clave
+Describe los módulos de GATE_1 y el banco de prompts; valida sintaxis,
+dependencias, imports y credenciales, y ejecuta pruebas locales simuladas,
+incluidas las de clasificación de errores, reintentos, backoff, costo por
+operación y validación de respuestas. También incorpora la revisión de los
+nuevos módulos `pipeline_texto.py` y `evaluar_salidas.py`.
 
-- [src/GATE_1/monolitico.py](src/GATE_1/monolitico.py): cliente base para armar y enviar peticiones a Gemini.
-- [src/GATE_1/cliente_reintento.py](src/GATE_1/cliente_reintento.py): reintentos con backoff y jitter.
-- [src/GATE_1/cliente.py](src/GATE_1/cliente.py): interfaz principal con costo por operación y manejo de errores.
-- [src/GATE_1/consumir_gemini.py](src/GATE_1/consumir_gemini.py): cliente robusto con validación de respuestas y configuración.
-- [src/GATE_1/latencia.py](src/GATE_1/latencia.py): mide tiempos y calcula promedio y costo.
-- [prompts/banco.py](prompts/banco.py): banco de prompts estructurados y automatizados.
+Para ejecutar solo comprobaciones locales sin llamar a la API real:
+
+```console
+python src/GATE_1/revision_gate_1.py --omitir-api
+```
+
+## Decisión de arquitectura
+
+Se puede consultar la explicación completa de la decisión de modelo, costes y
+arquitectura en [docs/decision-arquitectura.md](docs/decision-arquitectura.md).
+
+## Banco de prompts
+
+El banco de prompts en `prompts/banco.py` prueba respuestas estructuradas en JSON
+y guarda un resumen de resultados en `prompts/registro_resultados.json`.
+
+Esto permite evaluar si el modelo devuelve exactamente los campos esperados y si
+la respuesta es consistente entre varios intentos.
 
 ## Documentación adicional
 
-- [docs/decision-arquitectura.md](docs/decision-arquitectura.md): decisiones de diseño, modelo elegido y cálculo de costos.
-- [docs/registro_resultados.txt](docs/registro_resultados.txt): registro de resultados de pruebas y evaluaciones.
+- [docs/decision-arquitectura.md](docs/decision-arquitectura.md): decisiones de modelo, arquitectura y cálculo de costos.
+- [docs/registro_resultados.txt](docs/registro_resultados.txt): registro de resultados de pruebas y evaluaciones del proyecto.
 
 ## Notas importantes
 
-- Los módulos de `src/GATE_1` se ejecutan mejor desde la raíz del repositorio.
-- Si `GEMINI_API_KEY` está vacía o conserva el valor de ejemplo, la ejecución falla explícitamente para evitar llamadas no autorizadas.
-- Los errores 401 y 403 se consideran permanentes; no se reintentan.
-- Los errores 429, 5xx, timeout y de conexión se manejan con reintentos controlados.
-- El costo mostrado es una estimación local de la sesión actual y no reemplaza la facturación real del proveedor.
+- Los módulos de `src/GATE_1` están pensados para ejecutarse como scripts desde la raíz del proyecto.
+- Si la variable `GEMINI_API_KEY` no existe o conserva el valor de ejemplo, la aplicación falla con un error explícito para evitar llamadas no autenticadas.
+- En caso de 429, 5xx, timeout o problemas de conexión, el cliente modular reintenta automáticamente hasta un máximo configurado.
+- Los errores de autenticación (401/403) se consideran permanentes y no se reintentan.
+- El cálculo de costo es local y estimado; no representa una factura real.
 
-## Roadmap
+## Siguientes pasos
 
-- ampliar casos de uso con más prompts y escenarios reales;
-- añadir pruebas de integración para evaluación de salidas;
-- encapsular más flujo de negocio en módulos reutilizables;
-- integrar comparadores semánticos y métricas más avanzadas.
-
-## Conclusión
-
-Este repositorio sirve como punto de partida para aprender a integrar un modelo generativo, validar sus respuestas y estimar el costo operativo de cada interacción. La intención es formar una base sólida para luego pasar a proyectos más complejos de IA aplicada al desarrollo y a la evaluación de software.
+- ampliar el repositorio con más casos de uso y módulos funcionales;
+- añadir pruebas de integración para prompt engineering;
+- encapsular la lógica de llamadas a la API para reutilizarla en otros proyectos;
+- incorporar métricas más avanzadas de evaluación de salidas y calidad del texto.
