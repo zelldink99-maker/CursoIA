@@ -38,6 +38,14 @@ MODULES = {
         "Cliente robusto: valida la pregunta, configuración, HTTP y respuesta.",
         "Una pregunta válida devuelve texto; errores de API o configuración son explícitos.",
     ),
+    "pipeline_texto.py": (
+        "Limpia, tokeniza y vectoriza texto para comparar respuestas con referencias.",
+        "La limpieza normaliza mayúsculas, puntuación y espacios y los tokens se procesan sin errores.",
+    ),
+    "evaluar_salidas.py": (
+        "Compara la respuesta del modelo con una referencia antes y después de limpiar.",
+        "El script imprime las métricas crudas y procesadas sin depender de la API real.",
+    ),
     "cliente.py": (
         "Cliente modular con clasificación de errores y registro de costos.",
         "Devuelve texto, reintenta fallos transitorios y acumula el costo por operación.",
@@ -125,11 +133,13 @@ def _importar_modulos() -> dict[str, object]:
         cliente_reintento,
         consumir_gemini,
         costo,
+        evaluar_salidas,
         latencia,
         main,
         module_test,
         monolitico,
         peticiones,
+        pipeline_texto,
     )
     from prompts import banco as banco_prompts
 
@@ -140,11 +150,13 @@ def _importar_modulos() -> dict[str, object]:
         "cliente_reintento": cliente_reintento,
         "consumir_gemini": consumir_gemini,
         "costo": costo,
+        "evaluar_salidas": evaluar_salidas,
         "latencia": latencia,
         "main": main,
         "module_test": module_test,
         "monolitico": monolitico,
         "peticiones": peticiones,
+        "pipeline_texto": pipeline_texto,
         "banco_prompts": banco_prompts,
     }
 
@@ -901,6 +913,82 @@ def _revisar_banco_prompts(reporte: Reporte, modulos: dict[str, object]) -> None
     )
 
 
+def _revisar_pipeline_texto(reporte: Reporte, modulos: dict[str, object]) -> None:
+    """Ejecuta las comprobaciones de limpieza y tokenización del pipeline de texto."""
+    pipeline = modulos["pipeline_texto"]
+
+    normalizado = pipeline.limpiar_texto("  El Cielo, es AZUL!  ")
+    con_tildes = pipeline.limpiar_texto("¡El pingüino niño tiene 3 años!")
+    texto_limpio_ok = (
+        normalizado == "el cielo es azul"
+        and con_tildes == "el pingüino niño tiene 3 años"
+    )
+
+    try:
+        pipeline.limpiar_texto(42)  # type: ignore[arg-type]
+    except TypeError:
+        tipo_rechazado = True
+    else:
+        tipo_rechazado = False
+
+    tokens_ok = pipeline.procesar_texto("El Cielo, es AZUL!") == [
+        "el",
+        "cielo",
+        "es",
+        "azul",
+    ]
+    vector_ok = pipeline.vectorizar(["el", "gato", "y", "el", "perro"]) == {
+        "el": 2,
+        "gato": 1,
+        "y": 1,
+        "perro": 1,
+    }
+
+    correcto = (
+        texto_limpio_ok
+        and tipo_rechazado
+        and tokens_ok
+        and vector_ok
+        and pipeline.procesar_texto("¡¡¡...!!!") == []
+    )
+    reporte.agregar(
+        "pipeline_texto.py",
+        "Limpieza, tokenización y vectorización",
+        correcto,
+        (
+            "normaliza texto, rechaza tipos inválidos y devuelve tokens/vectores esperados"
+            if correcto
+            else "una o más funciones del pipeline de texto no cumplen la validación local"
+        ),
+    )
+
+    evaluar = modulos["evaluar_salidas"]
+    with patch.object(
+        evaluar,
+        "consultar_modelo",
+        return_value="python es un lenguaje de programación, interpretado!",
+    ):
+        with redirect_stdout(StringIO()) as salida:
+            codigo = evaluar.main()
+    salida_ok = (
+        codigo == 0
+        and salida.getvalue().splitlines() == [
+            "[Caso 1] Coincidencia texto crudo: 57.1%",
+            "[Caso 1] Coincidencia texto procesado: 100.0%",
+        ]
+    )
+    reporte.agregar(
+        "evaluar_salidas.py",
+        "Comparación de texto crudo y procesado",
+        salida_ok,
+        (
+            "imprime las dos métricas esperadas sin consultar la API real"
+            if salida_ok
+            else "la comparación no produjo el formato ni los valores esperados"
+        ),
+    )
+
+
 def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
     """Verifica los scripts de ejemplo sin enviar solicitudes a la red."""
     clave = "clave-local-de-prueba"
@@ -1092,6 +1180,7 @@ def main() -> int:
         _revisar_monolitico(reporte, modulos)
         _revisar_latencia(reporte, modulos)
         _revisar_banco_prompts(reporte, modulos)
+        _revisar_pipeline_texto(reporte, modulos)
         _revisar_scripts(reporte, modulos)
 
     print("\n5. DISPONIBILIDAD DE LA API")
