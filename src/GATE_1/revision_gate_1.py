@@ -18,7 +18,7 @@ from unittest.mock import Mock, patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 GATE_DIR = Path(__file__).resolve().parent
-MODEL = "gemini-3.8-flash"
+MODEL = "gemini-3.5-flash"
 # Permite importar el paquete cuando el verificador se inicia desde cualquier carpeta.
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -51,8 +51,8 @@ MODULES = {
         "Conserva las respuestas generadas y permite priorizar casos con F1 bajo.",
     ),
     "revisar_cualitativamente.py": (
-        "Prepara una muestra de F1 bajo y alto con campos para una rúbrica manual.",
-        "No duplica casos con muestras pequeñas y no necesita consultar la API.",
+        "Prepara y valida una muestra de revisión para la actividad core del Bloque 17.",
+        "Comprueba 20 resultados, 10 calificaciones justificadas y límites documentados.",
     ),
     "cliente.py": (
         "Cliente modular con clasificación de errores y registro de costos.",
@@ -130,6 +130,12 @@ class Reporte:
         if estados and all(estado is True for estado in estados):
             return True
         return None
+
+
+def _codigo_salida(reporte: Reporte) -> int:
+    """Falla si hay errores o si la actividad core sigue pendiente."""
+    actividad_core = reporte.estado_grupo("Actividad core Bloque 17")
+    return 1 if reporte.fallo or actividad_core is not True else 0
 
 
 def _importar_modulos() -> dict[str, object]:
@@ -1045,7 +1051,7 @@ def _revisar_pipeline_texto(reporte: Reporte, modulos: dict[str, object]) -> Non
             caso["correccion_factual"] == ""
             and caso["completitud"] == ""
             and caso["contradiccion"] == ""
-            and caso["justificacion"] == ""
+            and caso["nota"] == ""
             for caso in muestra
         )
     )
@@ -1089,6 +1095,166 @@ def _revisar_pipeline_texto(reporte: Reporte, modulos: dict[str, object]) -> Non
             else "la comparación no produjo el formato ni los valores esperados"
         ),
     )
+
+
+def _revisar_actividad_core(
+    reporte: Reporte,
+    modulos: dict[str, object],
+) -> None:
+    """Comprueba los entregables de la actividad core sin generar llamadas API."""
+    revisor = modulos["revisar_cualitativamente"]
+    ruta_resultados = revisor.ruta_resultados_predeterminada()
+    ruta_revision = PROJECT_ROOT / "revision_manual.json"
+    ruta_limites = PROJECT_ROOT / "docs" / "limites_metrica.md"
+
+    try:
+        resultados = revisor.cargar_resultados(ruta_resultados)
+    except FileNotFoundError:
+        resultados = None
+        reporte.agregar(
+            "Actividad core Bloque 17",
+            "20 respuestas generadas",
+            None,
+            "pendiente: genera al menos 20 respuestas; "
+            "usa evaluar_metricas.py --actividad-core o completa resultados_metricas.json",
+        )
+    except (OSError, ValueError) as error:
+        resultados = None
+        reporte.agregar(
+            "Actividad core Bloque 17",
+            "20 respuestas generadas",
+            False,
+            f"{ruta_resultados.name} no es válido: {error}",
+        )
+    else:
+        if len(resultados) < revisor.MINIMO_RESULTADOS:
+            reporte.agregar(
+                "Actividad core Bloque 17",
+                "20 respuestas generadas",
+                None,
+                f"pendiente: hay {len(resultados)} de al menos "
+                f"{revisor.MINIMO_RESULTADOS} respuestas",
+            )
+        else:
+            try:
+                revisor.validar_resultados(resultados)
+            except ValueError as error:
+                reporte.agregar(
+                    "Actividad core Bloque 17",
+                    "20 respuestas generadas",
+                    False,
+                    str(error),
+                )
+                resultados = None
+            else:
+                reporte.agregar(
+                    "Actividad core Bloque 17",
+                    "20 respuestas generadas",
+                    True,
+                    f"{len(resultados)} respuestas con métricas completas",
+                )
+
+    if resultados is None or len(resultados) < revisor.MINIMO_RESULTADOS:
+        reporte.agregar(
+            "Actividad core Bloque 17",
+            "10 revisiones manuales",
+            None,
+            "pendiente de generar y evaluar al menos 20 respuestas",
+        )
+        reporte.agregar(
+            "Actividad core Bloque 17",
+            "Límites basados en la revisión",
+            None,
+            "pendiente de completar las revisiones manuales",
+        )
+        return
+
+    try:
+        revisiones = revisor.cargar_resultados(ruta_revision)
+    except FileNotFoundError:
+        revisiones = None
+        reporte.agregar(
+            "Actividad core Bloque 17",
+            "10 revisiones manuales",
+            None,
+            "pendiente: genera revision_manual.json y completa la rúbrica y las notas",
+        )
+    except (OSError, ValueError) as error:
+        revisiones = None
+        reporte.agregar(
+            "Actividad core Bloque 17",
+            "10 revisiones manuales",
+            False,
+            f"revision_manual.json no es válido: {error}",
+        )
+    else:
+        campos_revision = (
+            "correccion_factual",
+            "completitud",
+            "contradiccion",
+            "nota",
+        )
+        incompletas = [
+            caso
+            for caso in revisiones
+            if any(
+                not isinstance(caso.get(campo), str)
+                or not caso[campo].strip()
+                for campo in campos_revision
+            )
+        ]
+        if len(revisiones) < revisor.MINIMO_REVISIONES or incompletas:
+            reporte.agregar(
+                "Actividad core Bloque 17",
+                "10 revisiones manuales",
+                None,
+                f"pendiente: {len(revisiones)} casos; "
+                f"{len(incompletas)} aún sin completar",
+            )
+        else:
+            try:
+                revisor.validar_revision_manual(resultados, revisiones)
+            except ValueError as error:
+                reporte.agregar(
+                    "Actividad core Bloque 17",
+                    "10 revisiones manuales",
+                    False,
+                    str(error),
+                )
+                revisiones = None
+            else:
+                reporte.agregar(
+                    "Actividad core Bloque 17",
+                    "10 revisiones manuales",
+                    True,
+                    f"{len(revisiones)} casos con rúbrica, nota y extremos de F1",
+                )
+
+    if revisiones is None:
+        reporte.agregar(
+            "Actividad core Bloque 17",
+            "Límites basados en la revisión",
+            None,
+            "pendiente de completar y validar las revisiones manuales",
+        )
+        return
+
+    try:
+        revisor.validar_documentacion(ruta_limites, resultados, revisiones)
+    except (OSError, ValueError) as error:
+        reporte.agregar(
+            "Actividad core Bloque 17",
+            "Límites basados en la revisión",
+            None,
+            f"pendiente: actualiza docs/limites_metrica.md con los hallazgos: {error}",
+        )
+    else:
+        reporte.agregar(
+            "Actividad core Bloque 17",
+            "Límites basados en la revisión",
+            True,
+            "documenta secciones requeridas, muestra y hallazgos rastreables",
+        )
 
 
 def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
@@ -1283,6 +1449,7 @@ def main() -> int:
         _revisar_latencia(reporte, modulos)
         _revisar_banco_prompts(reporte, modulos)
         _revisar_pipeline_texto(reporte, modulos)
+        _revisar_actividad_core(reporte, modulos)
         _revisar_scripts(reporte, modulos)
 
     print("\n5. DISPONIBILIDAD DE LA API")
@@ -1310,6 +1477,7 @@ def main() -> int:
         "Entorno reproducible",
         "Credenciales no expuestas",
         "Código ejecutable",
+        "Actividad core Bloque 17",
     ):
         estado = reporte.estado_grupo(grupo)
         etiqueta = (
@@ -1322,7 +1490,7 @@ def main() -> int:
         print("La prueba de disponibilidad envió una petición real a Gemini.")
     else:
         print("Las pruebas ejecutadas se hicieron sin llamadas de red.")
-    return 1 if reporte.fallo else 0
+    return _codigo_salida(reporte)
 
 
 if __name__ == "__main__":
