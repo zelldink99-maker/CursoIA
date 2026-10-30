@@ -4,6 +4,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 import subprocess
+from unittest.mock import Mock
 
 import pytest
 
@@ -13,6 +14,9 @@ if str(ROOT_DIR) not in sys.path:
 
 from src.GATE_1 import evaluar_salidas
 from src.GATE_1.pipeline_texto import (
+    calcular_metricas,
+    calcular_precision_cobertura_f1,
+    contar_coincidencias,
     limpiar_texto,
     procesar_texto,
     tokenizar,
@@ -51,6 +55,61 @@ def test_vectorizar_cuenta_repeticiones() -> None:
     assert vectorizar(["el", "gato", "y", "el", "perro"]) == Counter(
         {"el": 2, "gato": 1, "y": 1, "perro": 1}
     )
+
+
+def test_contar_coincidencias_respeta_repeticiones() -> None:
+    assert contar_coincidencias(
+        ["el", "gato", "el", "gato"],
+        ["el", "gato"],
+    ) == 2
+
+
+def test_contar_coincidencias_rechaza_texto_sin_tokenizar() -> None:
+    with pytest.raises(TypeError, match="tokens_referencia debe ser una lista"):
+        contar_coincidencias("el gato", ["el", "gato"])  # type: ignore[arg-type]
+
+
+def test_calcular_precision_cobertura_f1_ejemplo_de_la_leccion() -> None:
+    assert calcular_precision_cobertura_f1(
+        ["el", "gato", "duerme", "en", "el", "sofá"],
+        ["el", "gato", "duerme", "en", "el", "sillón", "todo", "el", "día"],
+    ) == pytest.approx(
+        {"precision": 5 / 9, "cobertura": 5 / 6, "f1": 2 * 5 / (9 + 6)}
+    )
+
+
+@pytest.mark.parametrize(
+    ("referencia", "respuesta", "esperado"),
+    [
+        ("", "respuesta", {"precision": 0.0, "cobertura": 0.0, "f1": 0.0}),
+        ("referencia", "", {"precision": 0.0, "cobertura": 0.0, "f1": 0.0}),
+        (
+            "El auto es veloz.",
+            "El vehículo es rápido.",
+            {"precision": 0.5, "cobertura": 0.5, "f1": 0.5},
+        ),
+        (
+            "Python fue creado en 1991.",
+            "Python fue creado en 1989.",
+            {"precision": 0.8, "cobertura": 0.8, "f1": 0.8},
+        ),
+        (
+            "Python no es un lenguaje compilado.",
+            "Python es un lenguaje compilado.",
+            {
+                "precision": 1.0,
+                "cobertura": 5 / 6,
+                "f1": 10 / 11,
+            },
+        ),
+    ],
+)
+def test_calcular_metricas_y_limites_de_coincidencia_lexica(
+    referencia: str,
+    respuesta: str,
+    esperado: dict[str, float],
+) -> None:
+    assert calcular_metricas(referencia, respuesta) == pytest.approx(esperado)
 
 
 def test_coincidencia_mide_formato_crudo_y_procesado() -> None:
@@ -95,7 +154,7 @@ def test_evaluar_salidas_imprime_solo_las_dos_metricas(
     monkeypatch.setattr(
         evaluar_salidas,
         "consultar_modelo",
-        lambda consulta: "python es un lenguaje de programación, interpretado!",
+        Mock(return_value="python es un lenguaje de programación, interpretado!"),
     )
 
     assert evaluar_salidas.main() == 0

@@ -200,18 +200,55 @@ Además de la consulta a Gemini, el proyecto incluye un flujo local para limpiar
 comparar y evaluar texto antes de interpretar la respuesta del modelo:
 
 - `src/GATE_1/pipeline_texto.py`: limpia el texto, elimina puntuación y espacios
-  extra, tokeniza y genera un conteo de frecuencias por palabra.
+  extra, tokeniza, genera conteos por palabra y calcula coincidencias,
+  precisión, cobertura y F1 sin perder las repeticiones.
 - `src/GATE_1/evaluar_salidas.py`: compara la respuesta del modelo con una
   referencia usando métricas sobre texto crudo y texto normalizado.
+- `src/GATE_1/evaluar_metricas.py`: evalúa varias respuestas reales, conserva
+  respuesta y métricas en `resultados_metricas.json`, calcula promedios y
+  muestra primero los casos con menor F1.
+- `src/GATE_1/revisar_cualitativamente.py`: prepara una muestra de los F1 más
+  bajos y más altos en `revision_cualitativa.json`, lista para completar a mano
+  con una rúbrica de corrección factual, completitud y contradicción.
 
-Estas funciones sirven para detectar coincidencias de contenido y validar que
-las respuestas del modelo tengan un formato usable, sin depender de llamadas a
-la API real durante el desarrollo local.
+La precisión mide qué proporción de las palabras generadas aparece en la
+referencia; la cobertura mide qué proporción de la referencia aparece en la
+respuesta. F1 combina ambas. La coincidencia cuenta repeticiones, pero sigue
+siendo léxica: no reconoce sinónimos y puede puntuar alto una respuesta con un
+número equivocado o una negación omitida. Por eso estas métricas ayudan a
+priorizar revisiones, pero no determinan por sí solas si una respuesta es
+correcta.
 
-Para ejecutarlas en pruebas locales:
+Para ejecutar el conjunto de tres consultas de ejemplo desde la raíz (cada
+consulta puede generar costo de API):
+
+```console
+python -m src.GATE_1.evaluar_metricas
+```
+
+El archivo JSON se actualiza después de cada respuesta exitosa, de modo que
+los resultados parciales se conservan si una consulta posterior falla. Para
+preparar una muestra para revisar (sin volver a llamar a la API), primero
+genera o conserva `resultados_metricas.json` y ejecuta:
+
+```console
+python -m src.GATE_1.revisar_cualitativamente
+```
+
+El comando selecciona hasta cinco casos con F1 más bajo y cinco con F1 más
+alto; con menos de diez resultados reparte la muestra entre ambos extremos sin
+duplicados. Edita `revision_cualitativa.json` y completa la corrección factual,
+la completitud y la contradicción con `sí`, `no` o `parcialmente` según
+corresponda, además de justificar cada decisión. La [documentación de límites
+de la métrica](docs/limites_metrica.md) describe sus fallos conocidos y cuándo
+conviene revisar manualmente.
+
+Para probar las funciones sin conexión ni costo de API:
 
 ```console
 python -m pytest tests/test_pipeline_texto.py -q
+python -m pytest tests/test_evaluar_metricas.py -q
+python -m pytest tests/test_revisar_cualitativamente.py -q
 ```
 
 ## Revisar GATE_1
@@ -225,8 +262,9 @@ python src/GATE_1/revision_gate_1.py
 Describe los módulos de GATE_1 y el banco de prompts; valida sintaxis,
 dependencias, imports y credenciales, y ejecuta pruebas locales simuladas,
 incluidas las de clasificación de errores, reintentos, backoff, costo por
-operación y validación de respuestas. También incorpora la revisión de los
-nuevos módulos `pipeline_texto.py` y `evaluar_salidas.py`.
+operación y validación de respuestas. También incorpora la revisión de
+`pipeline_texto.py`, `evaluar_salidas.py`, `evaluar_metricas.py` y
+`revisar_cualitativamente.py`.
 
 Para ejecutar solo comprobaciones locales sin llamar a la API real:
 
@@ -250,6 +288,7 @@ la respuesta es consistente entre varios intentos.
 ## Documentación adicional
 
 - [docs/decision-arquitectura.md](docs/decision-arquitectura.md): decisiones de modelo, arquitectura y cálculo de costos.
+- [docs/limites_metrica.md](docs/limites_metrica.md): límites conocidos de precisión, cobertura y F1, rúbrica y recomendación de revisión manual.
 - [docs/registro_resultados.txt](docs/registro_resultados.txt): registro de resultados de pruebas y evaluaciones del proyecto.
 
 ## Notas importantes
