@@ -208,7 +208,7 @@ comparar y evaluar texto antes de interpretar la respuesta del modelo:
   respuesta y métricas en `resultados_metricas.json`, calcula promedios y
   muestra primero los casos con menor F1.
 - `src/GATE_1/revisar_cualitativamente.py`: prepara una muestra de los F1 más
-  bajos y más altos en `revision_cualitativa.json`, lista para completar a mano
+  bajos y más altos en `revision_manual.json`, lista para completar a mano
   con una rúbrica de corrección factual, completitud y contradicción.
 
 La precisión mide qué proporción de las palabras generadas aparece en la
@@ -228,20 +228,50 @@ python -m src.GATE_1.evaluar_metricas
 
 El archivo JSON se actualiza después de cada respuesta exitosa, de modo que
 los resultados parciales se conservan si una consulta posterior falla. Para
-preparar una muestra para revisar (sin volver a llamar a la API), primero
-genera o conserva `resultados_metricas.json` y ejecuta:
+generar los 20 resultados requeridos por la actividad core (20 consultas, que
+pueden generar costo de API), ejecuta de forma explícita:
+
+```console
+python -m src.GATE_1.evaluar_metricas --actividad-core
+```
+
+Este modo guarda el lote en `resultados_actividad_core.json` para no sobrescribir
+`resultados_metricas.json`; si una ejecución se interrumpe, volver a ejecutar
+este modo reutiliza las respuestas ya guardadas y consulta únicamente las
+pendientes. Después, prepara la muestra para revisar sin volver a llamar a la
+API:
 
 ```console
 python -m src.GATE_1.revisar_cualitativamente
 ```
 
-El comando selecciona hasta cinco casos con F1 más bajo y cinco con F1 más
-alto; con menos de diez resultados reparte la muestra entre ambos extremos sin
-duplicados. Edita `revision_cualitativa.json` y completa la corrección factual,
-la completitud y la contradicción con `sí`, `no` o `parcialmente` según
-corresponda, además de justificar cada decisión. La [documentación de límites
-de la métrica](docs/limites_metrica.md) describe sus fallos conocidos y cuándo
-conviene revisar manualmente.
+El comando selecciona cinco casos con F1 más bajo y cinco con F1 más alto, y
+guarda `revision_manual.json`. Lee cada respuesta junto a su referencia;
+completa corrección factual y completitud (`sí`, `no` o `parcialmente`),
+contradicción (`sí` o `no`) y una explicación en `nota`. No rellenes la rúbrica
+automáticamente: requiere tu juicio manual.
+
+Cada ejecución vuelve a generar `revision_manual.json` desde los resultados y
+reemplaza el archivo anterior, incluidas las calificaciones manuales que
+contuviera. Completa la revisión después de generar la plantilla.
+
+Si todavía tienes menos de 20 resultados, el revisor igualmente prepara una
+muestra parcial de los casos disponibles y advierte que la actividad sigue
+incompleta. Puedes revisarlos mientras generas más respuestas; el gate no dará
+por cumplido el mínimo hasta tener 20 resultados y 10 revisiones.
+
+El revisor usa `resultados_actividad_core.json` si existe; si no, lee
+`resultados_metricas.json`. Este último debe contener al menos 20 resultados
+para cumplir la actividad core. Si tus resultados están en otro archivo,
+indícalo con `--entrada ruta\al\archivo.json`.
+
+Al terminar, actualiza las cuatro secciones de
+[docs/limites_metrica.md](docs/limites_metrica.md) con los conteos, la fecha, el
+criterio de selección y ejemplos concretos enlazados a consultas y F1 de tu
+`revision_manual.json`. El gate devuelve un código de salida distinto de cero
+mientras falten los resultados, las diez revisiones o los hallazgos
+documentados. Omitir la comprobación real de API con `--omitir-api` no provoca
+un fallo por sí solo.
 
 Para probar las funciones sin conexión ni costo de API:
 
@@ -264,7 +294,8 @@ dependencias, imports y credenciales, y ejecuta pruebas locales simuladas,
 incluidas las de clasificación de errores, reintentos, backoff, costo por
 operación y validación de respuestas. También incorpora la revisión de
 `pipeline_texto.py`, `evaluar_salidas.py`, `evaluar_metricas.py` y
-`revisar_cualitativamente.py`.
+`revisar_cualitativamente.py`, y reporta como pendiente la actividad core
+mientras falten los resultados, la revisión manual o los hallazgos documentados.
 
 Para ejecutar solo comprobaciones locales sin llamar a la API real:
 

@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "consulta": "¿Qué es Python?",
+    "referencia": "Python es un lenguaje de programación interpretado.",
+    "respuesta": "**Python** es un lenguaje de programación de alto nivel, interpretado y de código abierto. \n\nSe caracteriza por su **sintaxis sencilla y legible**, muy parecida al idioma inglés, lo que lo hace ideal tanto para principiantes como para expertos. \n\nEs uno de los lenguajes más populares del mundo y se utiliza principalmente para:\n* **Inteligencia Artificial y Machine Learning**\n* **Ciencia y análisis de datos**\n* **Desarrollo web** (backend)\n* **Automatización de tareas** (scripts)",
+    "precision": 0.10144927536231885,
+    "cobertura": 1.0,
+    "f1": 0.1842105263157895
+  },
+  {
+    "consulta": "¿Cuándo se creó Python?",
+    "referencia": "Python fue creado en 1991.",
+    "respuesta": "Python fue creado por Guido van Rossum a finales de los años 80, y su primera versión pública (la 0.9.0) fue lanzada en **febrero de 1991**.",
+    "precision": 0.19230769230769232,
+    "cobertura": 1.0,
+    "f1": 0.32258064516129037
+  },
+  {
+    "consulta": "¿Qué es una lista en Python?",
+    "referencia": "Una lista es una colección ordenada y modificable.",
+    "respuesta": "Una **lista en Python** es una estructura de datos que permite almacenar una colección **ordenada** y **modificable** (mutable) de elementos.\n\n**Características principales:**\n* **Sintaxis:** Se definen utilizando corchetes `[]` y separando los elementos con comas.\n* **Flexibles:** Pueden contener elementos de diferentes tipos de datos (números, texto, booleanos, incluso otras listas) y admiten valores duplicados.\n* **Mutables:** Se pueden añadir, eliminar o cambiar sus elementos después de haber sido creada.\n\n**Ejemplo:**\n```python\nmi_lista = [10, \"Python\", True, 3.14]\n```",
+    "precision": 0.1095890410958904,
+    "cobertura": 1.0,
+    "f1": 0.19753086419753085
+  }
+]
