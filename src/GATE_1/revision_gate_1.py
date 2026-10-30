@@ -39,12 +39,20 @@ MODULES = {
         "Una pregunta válida devuelve texto; errores de API o configuración son explícitos.",
     ),
     "pipeline_texto.py": (
-        "Limpia, tokeniza y vectoriza texto para comparar respuestas con referencias.",
-        "La limpieza normaliza mayúsculas, puntuación y espacios y los tokens se procesan sin errores.",
+        "Limpia y tokeniza texto, y calcula coincidencias, precisión, cobertura y F1.",
+        "La limpieza conserva tildes/números; las métricas cuentan repeticiones.",
     ),
     "evaluar_salidas.py": (
         "Compara la respuesta del modelo con una referencia antes y después de limpiar.",
         "El script imprime las métricas crudas y procesadas sin depender de la API real.",
+    ),
+    "evaluar_metricas.py": (
+        "Evalúa respuestas por lote con precisión, cobertura y F1 y guarda resultados JSON.",
+        "Conserva las respuestas generadas y permite priorizar casos con F1 bajo.",
+    ),
+    "revisar_cualitativamente.py": (
+        "Prepara una muestra de F1 bajo y alto con campos para una rúbrica manual.",
+        "No duplica casos con muestras pequeñas y no necesita consultar la API.",
     ),
     "cliente.py": (
         "Cliente modular con clasificación de errores y registro de costos.",
@@ -133,6 +141,7 @@ def _importar_modulos() -> dict[str, object]:
         cliente_reintento,
         consumir_gemini,
         costo,
+        evaluar_metricas,
         evaluar_salidas,
         latencia,
         main,
@@ -140,6 +149,7 @@ def _importar_modulos() -> dict[str, object]:
         monolitico,
         peticiones,
         pipeline_texto,
+        revisar_cualitativamente,
     )
     from prompts import banco as banco_prompts
 
@@ -150,6 +160,7 @@ def _importar_modulos() -> dict[str, object]:
         "cliente_reintento": cliente_reintento,
         "consumir_gemini": consumir_gemini,
         "costo": costo,
+        "evaluar_metricas": evaluar_metricas,
         "evaluar_salidas": evaluar_salidas,
         "latencia": latencia,
         "main": main,
@@ -157,6 +168,7 @@ def _importar_modulos() -> dict[str, object]:
         "monolitico": monolitico,
         "peticiones": peticiones,
         "pipeline_texto": pipeline_texto,
+        "revisar_cualitativamente": revisar_cualitativamente,
         "banco_prompts": banco_prompts,
     }
 
@@ -943,12 +955,26 @@ def _revisar_pipeline_texto(reporte: Reporte, modulos: dict[str, object]) -> Non
         "y": 1,
         "perro": 1,
     }
+    metricas = pipeline.calcular_metricas(
+        "El gato duerme en el sofá.",
+        "El gato duerme en el sillón todo el día.",
+    )
+    metricas_esperadas = {
+        "precision": 5 / 9,
+        "cobertura": 5 / 6,
+        "f1": 2 * 5 / (9 + 6),
+    }
+    metricas_ok = all(
+        abs(metricas[nombre] - valor) < 1e-12
+        for nombre, valor in metricas_esperadas.items()
+    )
 
     correcto = (
         texto_limpio_ok
         and tipo_rechazado
         and tokens_ok
         and vector_ok
+        and metricas_ok
         and pipeline.procesar_texto("¡¡¡...!!!") == []
     )
     reporte.agregar(
@@ -959,6 +985,82 @@ def _revisar_pipeline_texto(reporte: Reporte, modulos: dict[str, object]) -> Non
             "normaliza texto, rechaza tipos inválidos y devuelve tokens/vectores esperados"
             if correcto
             else "una o más funciones del pipeline de texto no cumplen la validación local"
+        ),
+    )
+
+    evaluador_metricas = modulos["evaluar_metricas"]
+    resumen = evaluador_metricas.resumir_metricas(
+        [
+            {
+                "consulta": "consulta",
+                "referencia": "referencia",
+                "respuesta": "respuesta",
+                "precision": 0.8,
+                "cobertura": 0.6,
+                "f1": 0.7,
+            }
+        ]
+    )
+    reporte.agregar(
+        "evaluar_metricas.py",
+        "Resumen de métricas",
+        resumen
+        == {
+            "precision_promedio": 0.8,
+            "cobertura_promedio": 0.6,
+            "f1_promedio": 0.7,
+        },
+        "calcula los promedios localmente sin consultar la API",
+    )
+
+    revisor = modulos["revisar_cualitativamente"]
+    resultados = [
+        {
+            "consulta": f"consulta {indice}",
+            "referencia": f"referencia {indice}",
+            "respuesta": f"respuesta {indice}",
+            "precision": 0.5,
+            "cobertura": 0.5,
+            "f1": indice / 12,
+        }
+        for indice in range(12)
+    ]
+    muestra = revisor.preparar_revision(resultados)
+    muestra_ok = (
+        len(muestra) == 10
+        and [caso["consulta"] for caso in muestra]
+        == [
+            "consulta 0",
+            "consulta 1",
+            "consulta 2",
+            "consulta 3",
+            "consulta 4",
+            "consulta 7",
+            "consulta 8",
+            "consulta 9",
+            "consulta 10",
+            "consulta 11",
+        ]
+        and all(
+            caso["correccion_factual"] == ""
+            and caso["completitud"] == ""
+            and caso["contradiccion"] == ""
+            and caso["justificacion"] == ""
+            for caso in muestra
+        )
+    )
+    muestra_pequena = revisor.seleccionar_muestra(resultados[:6])
+    muestra_pequena_ok = len(muestra_pequena) == len(
+        {caso["consulta"] for caso in muestra_pequena}
+    )
+    reporte.agregar(
+        "revisar_cualitativamente.py",
+        "Selección y rúbrica manual",
+        muestra_ok and muestra_pequena_ok,
+        (
+            "selecciona extremos sin duplicados y prepara los campos de la rúbrica"
+            if muestra_ok and muestra_pequena_ok
+            else "falló la selección de extremos o la preparación de la rúbrica"
         ),
     )
 
