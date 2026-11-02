@@ -2,10 +2,11 @@
 
 ## Modelo elegido
 
-El cliente robusto `src/GATE_1/consumir_gemini.py` y el cliente
-`src/GATE_1/monolitico.py`, compartido por el banco de prompts y la medición
-de latencia, usan **Gemini 3.8 Flash** (`gemini-3.8-flash`). El segundo acepta
-una instrucción del sistema en cada solicitud.
+El flujo principal de producción es `src/GATE_1/cliente.py`, que usa
+`src/GATE_1/monolitico.py` como transporte y consulta **Gemini 3.8 Flash**
+(`gemini-3.8-flash`). El transporte acepta una instrucción del sistema en cada
+solicitud. `consumir_gemini.py` mantiene la interfaz anterior, pero delega
+todas las consultas en este cliente principal.
 
 El cliente de latencia y del banco de prompts fija la tarifa de Gemini 3.8 Flash
 descrita más adelante. No se incluyen comparaciones de latencia o calidad porque
@@ -30,13 +31,15 @@ la raíz para comprobar clasificación HTTP, reintentos, costos y la interfaz
 pública. El archivo también agrega la raíz del proyecto a `sys.path` y ejecuta
 pytest si se inicia directamente con `python tests/test_cliente.py`.
 
-El punto de entrada `python -m src.GATE_1.cliente` realiza una sola consulta de
-ejemplo. La función independiente `ejecutar_ensayo()` realiza diez consultas y
-muestra por cada respuesta exitosa el texto resumido, el total de tokens
-reportado, el costo de esa operación y el acumulado. El ensayo puede realizar
-hasta treinta solicitudes si las diez preguntas agotan los tres intentos cada
-una. Un error transitorio agotado se informa y permite continuar; los errores
-permanentes detienen el ensayo.
+El punto de entrada principal `python -m src.GATE_1.cliente` realiza una sola
+consulta y muestra el texto y su costo acumulado. `src/GATE_1/main.py` se
+conserva como lanzador compatible del mismo flujo. La función independiente
+`ejecutar_ensayo()` es una herramienta de evaluación, no de producción: realiza
+diez consultas y muestra por cada respuesta exitosa el texto resumido, el total
+de tokens reportado, el costo de esa operación y el acumulado. El ensayo puede
+realizar hasta treinta solicitudes si las diez preguntas agotan los tres
+intentos cada una. Un error transitorio agotado se informa y permite continuar;
+los errores permanentes detienen el ensayo.
 
 Desde la raíz, el ensayo se puede iniciar sin modificar el bloque `__main__`:
 
@@ -48,33 +51,45 @@ python -c "from src.GATE_1.cliente import ejecutar_ensayo; raise SystemExit(ejec
 
 ![Diagrama de arquitectura de la miniaplicación](./diagrama_arquitectura.jpg)
 
-El flujo robusto de consulta es:
+El flujo de producción de consulta es:
 
-1. `obtener_dato_de_prueba` recibe la pregunta y rechaza valores vacíos.
+1. `consultar_modelo` recibe la pregunta y rechaza valores vacíos.
 2. La configuración carga `GEMINI_API_KEY` desde el `.env` del proyecto; si falta o conserva el valor de ejemplo, informa el error.
 3. La aplicación prepara el cuerpo de la solicitud y envía una petición `POST` al endpoint `generateContent`, con la clave en el encabezado y un tiempo límite de 30 segundos.
 4. La respuesta HTTP se valida. Los errores de conexión, tiempo de espera, estado HTTP, JSON inválido o formato inesperado se convierten en mensajes explícitos.
-5. `extraer_texto` obtiene y concatena las partes de texto del primer candidato, y devuelve la respuesta.
+5. `extraer_texto` obtiene y concatena las partes de texto del primer candidato;
+   el cliente valida los metadatos de uso y registra el costo antes de devolver
+   la respuesta.
 
-Este flujo corresponde a `src/GATE_1/consumir_gemini.py`. `src/GATE_1/monolitico.py` también mantiene la clave fuera de la URL y convierte errores de configuración, conexión, tiempo de espera, HTTP y respuesta JSON en excepciones específicas derivadas de `GeminiError`. Ambos clientes validan las preguntas y el contenido de las respuestas.
+Este flujo corresponde a `src/GATE_1/cliente.py`, que utiliza
+`src/GATE_1/monolitico.py` para las solicitudes HTTP y la validación de Gemini.
+`src/GATE_1/main.py` y `src/GATE_1/consumir_gemini.py` conservan interfaces
+compatibles que delegan en el mismo cliente, sin duplicar la lógica de consulta.
 
-Los puntos de entrada `main.py`, `latencia.py` y `prompts/banco.py` capturan los errores esperables de sus operaciones y devuelven un código de salida distinto de cero. El cálculo de costos, la configuración de latencia y la división también rechazan entradas inválidas explícitamente. El verificador `revision_gate_1.py --omitir-api` cubre estos rechazos localmente sin realizar solicitudes a Gemini.
+El cliente principal y su lanzador compatible capturan los errores esperables y
+devuelven un código de salida distinto de cero. `latencia.py` y
+`prompts/banco.py` son herramientas de evaluación; `api_test.py` y
+`module_test.py` son comprobaciones del transporte. El cálculo de costos, la
+configuración de latencia y la división también rechazan entradas inválidas
+explícitamente. El verificador `revision_gate_1.py --omitir-api` cubre estos
+rechazos localmente sin realizar solicitudes a Gemini.
 
 ## Medición de latencia y estimación de costo
 
 La clase `Latencia`, en `src/GATE_1/latencia.py`, realiza cuatro solicitudes de prueba por defecto usando `gemini-3.8-flash` mediante las funciones de `src/GATE_1/monolitico.py`. Imprime el tiempo de cada solicitud, el promedio y estima el costo de la última respuesta con `calcular_costo`, de `src/GATE_1/costo.py`. La prueba se ejecuta al lanzar el módulo o llamar `Latencia.ejecutar()`; importarlo no realiza solicitudes.
 
 `enviar_peticion` conserva el JSON completo de Gemini, incluidos los metadatos
-`usageMetadata` cuando están presentes. El ejemplo ejecutable en
-`src/GATE_1/monolitico.py` extrae y muestra los tokens de entrada
+`usageMetadata` cuando están presentes. La función auxiliar de diagnóstico en
+`src/GATE_1/monolitico.py` puede extraer y mostrar los tokens de entrada
 (`promptTokenCount`), de salida (`candidatesTokenCount`) y el total
 (`totalTokenCount`). Si faltan o tienen un formato inválido, el cliente lo
 comunica como `GeminiResponseError`. El módulo `costo.py` usa los contadores de
 entrada, salida y, cuando viene separado, `thoughtsTokenCount` para estimar el
-costo. El cliente modular `cliente.py`, además, informa después de cada consulta
-exitosa el total de tokens reportado, el costo de esa operación y el costo
-acumulado. El total de tokens mostrado es `totalTokenCount`; la estimación de
-costo aplica el precio de entrada a `promptTokenCount` y el precio de salida a
+costo. El ensayo `ejecutar_ensayo()` de `cliente.py` informa por operación el
+total de tokens reportado, su costo y el acumulado; el flujo principal muestra
+la respuesta y el costo acumulado. El total de tokens mostrado es
+`totalTokenCount`; la estimación aplica el precio de entrada a
+`promptTokenCount` y el precio de salida a
 `candidatesTokenCount` más `thoughtsTokenCount` si está presente. Si el servicio
 no incluye metadatos válidos, se informa el error y no se contabiliza un costo
 estimado para esa respuesta.
@@ -110,12 +125,13 @@ partir de esa fecha.
 ## Contingencia: disponibilidad y límites de tokens
 
 Una demora o un error de Gemini no implica necesariamente que el modelo haya
-dejado de funcionar. El nuevo cliente `cliente.py` reintenta automáticamente
+dejado de funcionar. El cliente principal `cliente.py` reintenta automáticamente
 los errores 429, 5xx, timeout y conexión hasta tres intentos totales por
 operación. Entre ellos calcula una espera exponencial desde 2 segundos, duplica
 la espera para el siguiente intento, añade jitter de hasta el 10 % y limita
-cada espera a 30 segundos. Informa en consola cada reintento. Los demás
-consumidores conservan su comportamiento actual. Antes de cambiar el modelo,
+cada espera a 30 segundos. Informa en consola cada reintento. Las herramientas
+de latencia y banco de prompts conservan su comportamiento de evaluación.
+Antes de cambiar el modelo,
 revisa el estado HTTP y el mensaje de la API:
 
 - **HTTP 429** o `RESOURCE_EXHAUSTED`: puede indicar cuota o límite de solicitudes
@@ -137,14 +153,14 @@ revisa el estado HTTP y el mensaje de la API:
 ### Reintentos y cambio manual de modelo
 
 El proyecto no cambia de modelo automáticamente. El cliente modular
-`cliente.py` reintenta errores transitorios; `monolitico.py`, usado por la
-latencia y el banco de prompts, no aplica reintentos. Para cambiar el cliente
-compartido por la latencia y el banco de prompts,
-edita la variable `modelo` de `src/GATE_1/monolitico.py` y usa un identificador
-que aparezca habilitado para tu cuenta. Por ejemplo, podrías probar
+`cliente.py` reintenta errores transitorios; las herramientas de evaluación
+`latencia.py` y `prompts/banco.py` usan el mismo transporte sin reintentos.
+Para cambiar el modelo del flujo principal y de estas herramientas, edita la
+variable `modelo` de `src/GATE_1/monolitico.py` y usa un identificador que
+aparezca habilitado para tu cuenta. Por ejemplo, podrías probar
 `gemini-3.6-flash` como alternativa a `gemini-3.8-flash` **si la API la ofrece
-para tu proyecto**. El cliente independiente `src/GATE_1/consumir_gemini.py`
-tiene su propia constante `MODEL`; cambiar un cliente no cambia el otro.
+para tu proyecto**. La interfaz compatible `src/GATE_1/consumir_gemini.py`
+utiliza ese mismo cliente y no mantiene una configuración de modelo separada.
 
 Después del cambio, ejecuta `python src\GATE_1\revision_gate_1.py --omitir-api`
 para validar localmente el formato y luego realiza una petición

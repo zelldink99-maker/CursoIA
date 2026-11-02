@@ -12,7 +12,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1 import cliente, cliente_reintento, monolitico
+from src.GATE_1 import cliente, cliente_reintento, consumir_gemini, main, monolitico
 from src.GATE_1.costo import (
     PRECIO_ENTRADA_POR_TOKEN,
     PRECIO_SALIDA_POR_TOKEN,
@@ -25,6 +25,29 @@ def reiniciar_costos() -> None:
     cliente.costo_total_sesion = 0.0
     cliente.costo_ultima_operacion = 0.0
     cliente.tokens_ultima_operacion = 0
+
+
+def test_punto_de_entrada_compatible_delega_en_cliente() -> None:
+    """El lanzador heredado comparte el flujo principal de producción."""
+    with patch.object(cliente, "main", return_value=0) as ejecutar:
+        assert main.main() == 0
+
+    ejecutar.assert_called_once_with()
+
+
+def test_cliente_heredado_delega_consultas_en_cliente_principal() -> None:
+    """La interfaz anterior no mantiene una implementación de API separada."""
+    with patch.object(
+        cliente,
+        "consultar_modelo",
+        return_value="respuesta simulada",
+    ) as consultar:
+        assert (
+            consumir_gemini.obtener_dato_de_prueba("pregunta")
+            == "respuesta simulada"
+        )
+
+    consultar.assert_called_once_with("pregunta")
 
 
 def crear_respuesta_http(status_code: int, datos: dict[str, object]) -> Mock:
