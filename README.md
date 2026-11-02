@@ -91,10 +91,10 @@ hermanos no están configurados para la ejecución como módulo de paquete.
 
 La respuesta JSON de Gemini se conserva completa al volver de
 `enviar_peticion`; además del contenido generado puede incluir `usageMetadata`
-con los tokens de entrada, salida y total. Al ejecutar
-`python src/GATE_1/monolitico.py`, el ejemplo imprime la respuesta y esos tres
-contadores. El programa informa un error explícito si la API no incluye
-metadatos de tokens válidos.
+con los tokens de entrada, salida y total. `monolitico.py` proporciona el
+transporte de bajo nivel usado por el cliente principal. Para consultar el
+modelo en el flujo de producción, usa `src/GATE_1/cliente.py`, que aplica
+reintentos y registra el costo con los metadatos de uso.
 
 El módulo `src/GATE_1/costo.py` calcula el costo a partir del uso reportado y
 los precios oficiales de Gemini 3.8 Flash. La tarifa utilizada y sus condiciones
@@ -126,22 +126,20 @@ reintenta errores de autenticación (401/403) ni otros errores HTTP permanentes.
 El envío conserva la clave en el encabezado y usa el timeout de 30 segundos de
 `monolitico.py`.
 
-### Una consulta
+### Flujo principal de producción: una consulta
 
-Desde la raíz, ejecuta una consulta real. El bloque `__main__` llama una sola
-vez a `consultar_modelo`, imprime la respuesta y el costo acumulado:
+Desde la raíz, ejecuta el único flujo principal de consulta. Llama una vez a
+`consultar_modelo`, imprime la respuesta y el costo acumulado:
 
 ```console
 python -m src.GATE_1.cliente
 ```
 
-También se puede ejecutar directamente el archivo:
+`src/GATE_1/main.py` se conserva como lanzador compatible y
+`consumir_gemini.py` como interfaz de compatibilidad; ambos delegan en este
+mismo cliente. Para nuevas ejecuciones, usa el comando anterior.
 
-```console
-python src/GATE_1/cliente.py
-```
-
-### Ensayo de diez consultas
+### Ensayo de diez consultas (evaluación, no producción)
 
 Para ejecutar las diez preguntas de prueba (cada una puede generar costo), usa
 desde la raíz:
@@ -281,6 +279,39 @@ python -m pytest tests/test_evaluar_metricas.py -q
 python -m pytest tests/test_revisar_cualitativamente.py -q
 ```
 
+## LangChain: primera chain de tres pasos (Bloque 18)
+
+El proyecto incluye `src/GATE_1/cadena_tres_pasos.py`, que transforma texto
+técnico mediante tres etapas encadenadas:
+
+1. Extrae tres puntos clave.
+2. Los reescribe en lenguaje sencillo.
+3. Los convierte en viñetas Markdown.
+
+Cada etapa tiene su propio `PromptTemplate`, utiliza `StrOutputParser` para
+pasar texto plano al siguiente paso y conecta los nombres de entrada con
+`RunnableLambda`. `construir_cadena(modelo)` recibe el modelo desde afuera, lo
+que permite probar todo el flujo con respuestas simuladas.
+
+Instala las dependencias desde el entorno virtual:
+
+```console
+python -m pip install -r requirements.txt
+```
+
+Para ejecutar la chain real desde la raíz del proyecto:
+
+```console
+python -m src.GATE_1.cadena_tres_pasos
+```
+
+La ejecución requiere `GEMINI_API_KEY` en `.env` y realiza tres llamadas al
+modelo, que pueden generar costo. Para probarla sin red ni credenciales:
+
+```console
+python -m pytest tests/test_cadena_tres_pasos.py -q
+```
+
 ## Revisar GATE_1
 
 Desde la raíz del repositorio ejecuta el verificador:
@@ -294,8 +325,10 @@ dependencias, imports y credenciales, y ejecuta pruebas locales simuladas,
 incluidas las de clasificación de errores, reintentos, backoff, costo por
 operación y validación de respuestas. También incorpora la revisión de
 `pipeline_texto.py`, `evaluar_salidas.py`, `evaluar_metricas.py` y
-`revisar_cualitativamente.py`, y reporta como pendiente la actividad core
-mientras falten los resultados, la revisión manual o los hallazgos documentados.
+`revisar_cualitativamente.py`; comprueba también la chain de tres pasos de
+LangChain usando un modelo simulado, sin llamar a Gemini. Reporta como pendiente
+la actividad core mientras falten los resultados, la revisión manual o los
+hallazgos documentados.
 
 Para ejecutar solo comprobaciones locales sin llamar a la API real:
 
@@ -336,3 +369,17 @@ la respuesta es consistente entre varios intentos.
 - añadir pruebas de integración para prompt engineering;
 - encapsular la lógica de llamadas a la API para reutilizarla en otros proyectos;
 - incorporar métricas más avanzadas de evaluación de salidas y calidad del texto.
+
+## Changelog
+
+### Depurar y consolidar scripts redundantes en la raíz para dejar un único flujo principal de producción
+
+- Se definió `src/GATE_1/cliente.py` como flujo principal para consultar Gemini,
+  con reintentos, validación de respuestas y registro de costos.
+- `src/GATE_1/main.py` y `src/GATE_1/consumir_gemini.py` conservan sus interfaces
+  por compatibilidad y delegan las consultas en el cliente principal.
+- Se actualizó el gate para comprobar la delegación y la documentación para
+  indicar el comando recomendado: `python -m src.GATE_1.cliente`.
+- Validación: 25 pruebas pasaron y el gate local confirmó las comprobaciones del
+  flujo. La API real se omitió; el gate aún reporta pendiente la actividad core
+  (resultados y revisión manual incompletos).

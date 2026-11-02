@@ -22,6 +22,8 @@ MODEL = "gemini-3.5-flash"
 # Permite importar el paquete cuando el verificador se inicia desde cualquier carpeta.
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+if str(GATE_DIR) not in sys.path:
+    sys.path.insert(0, str(GATE_DIR))
 
 # Este catálogo sirve como guía de lectura y se imprime antes de las pruebas.
 # Cada entrada describe lo que hace el módulo y el comportamiento que se espera.
@@ -35,8 +37,8 @@ MODULES = {
         "Con una clave válida, Gemini devuelve una respuesta HTTP exitosa con texto.",
     ),
     "consumir_gemini.py": (
-        "Cliente robusto: valida la pregunta, configuración, HTTP y respuesta.",
-        "Una pregunta válida devuelve texto; errores de API o configuración son explícitos.",
+        "Interfaz de compatibilidad que delega en el cliente principal.",
+        "Mantiene la extracción previa y comparte validación, reintentos y costos.",
     ),
     "pipeline_texto.py": (
         "Limpia y tokeniza texto, y calcula coincidencias, precisión, cobertura y F1.",
@@ -53,6 +55,10 @@ MODULES = {
     "revisar_cualitativamente.py": (
         "Prepara y valida una muestra de revisión para la actividad core del Bloque 17.",
         "Comprueba 20 resultados, 10 calificaciones justificadas y límites documentados.",
+    ),
+    "cadena_tres_pasos.py": (
+        "Encadena extracción, simplificación y formato con LangChain.",
+        "Tres pasos usan StrOutputParser y permiten inyectar un modelo simulado.",
     ),
     "cliente.py": (
         "Cliente modular con clasificación de errores y registro de costos.",
@@ -71,8 +77,8 @@ MODULES = {
         "Con dos respuestas simuladas, registra dos tiempos y devuelve un promedio no negativo.",
     ),
     "main.py": (
-        "Ejecuta la demostración de aritmética y una consulta a Gemini.",
-        "La suma de ejemplo es 8 y, con API disponible, la consulta devuelve texto.",
+        "Lanzador compatible que delega en el cliente modular de producción.",
+        "Una consulta simulada devuelve texto y muestra el costo acumulado.",
     ),
     "module_test.py": (
         "Prueba el envío de una petición usando las funciones de peticiones.py.",
@@ -143,6 +149,7 @@ def _importar_modulos() -> dict[str, object]:
     from src.GATE_1 import (
         api_test,
         aritmetica,
+        cadena_tres_pasos,
         cliente,
         cliente_reintento,
         consumir_gemini,
@@ -162,6 +169,7 @@ def _importar_modulos() -> dict[str, object]:
     return {
         "api_test": api_test,
         "aritmetica": aritmetica,
+        "cadena_tres_pasos": cadena_tres_pasos,
         "cliente": cliente,
         "cliente_reintento": cliente_reintento,
         "consumir_gemini": consumir_gemini,
@@ -234,7 +242,12 @@ def _revisar_dependencias(reporte: Reporte) -> None:
             # no el nombre del módulo que luego se importa (dotenv).
             declaradas.add(re.split(r"[<>=!~]", entrada, maxsplit=1)[0].lower())
 
-    paquetes = {"requests": "requests", "python-dotenv": "dotenv"}
+    paquetes = {
+        "requests": "requests",
+        "python-dotenv": "dotenv",
+        "langchain": "langchain_core",
+        "langchain-google-genai": "langchain_google_genai",
+    }
     faltantes = [
         distribucion
         for distribucion, modulo in paquetes.items()
@@ -252,7 +265,8 @@ def _revisar_dependencias(reporte: Reporte) -> None:
             "Entorno reproducible",
             "Dependencias",
             True,
-            "requests y python-dotenv están declaradas e instaladas",
+            "requests, python-dotenv y LangChain con el conector de Gemini "
+            "están declarados e instalados",
         )
 
     version_ok = sys.version_info >= (3, 10)
@@ -495,15 +509,25 @@ def _revisar_cliente(reporte: Reporte, modulos: dict[str, object]) -> None:
         pregunta_vacia_rechazada = True
     else:
         pregunta_vacia_rechazada = False
-    correcto = formato_ok and pregunta_vacia_rechazada
+
+    with patch.object(
+        cliente.cliente,
+        "consultar_modelo",
+        return_value="simulada",
+    ) as consulta:
+        respuesta = cliente.obtener_dato_de_prueba("pregunta válida")
+    delegacion_ok = respuesta == "simulada" and consulta.call_args.args == (
+        "pregunta válida",
+    )
+    correcto = formato_ok and pregunta_vacia_rechazada and delegacion_ok
     reporte.agregar(
         "consumir_gemini.py",
-        "Validación local de respuesta",
+        "Compatibilidad y delegación al cliente principal",
         correcto,
         (
-            "concatena el texto y rechaza preguntas vacías"
+            "conserva extracción y validación, y comparte el cliente de producción"
             if correcto
-            else "no coincide el texto extraído o no rechaza pregunta vacía"
+            else "falló la extracción, el rechazo de pregunta vacía o la delegación"
         ),
     )
 
@@ -1257,6 +1281,44 @@ def _revisar_actividad_core(
         )
 
 
+def _revisar_cadena_langchain(
+    reporte: Reporte,
+    modulos: dict[str, object],
+) -> None:
+    """Prueba los tres pasos de LangChain usando respuestas simuladas."""
+    from langchain_core.messages import AIMessage
+
+    modelo_falso = Mock(
+        side_effect=[
+            AIMessage(content="punto uno\npunto dos\npunto tres"),
+            AIMessage(content="texto sencillo"),
+            AIMessage(content="- viñeta uno\n- viñeta dos"),
+        ]
+    )
+    cadena = modulos["cadena_tres_pasos"].construir_cadena(modelo_falso)
+    resultado = cadena.invoke({"texto": "Texto de prueba para el gate"})
+    correcto = (
+        modelo_falso.call_count == 3
+        and resultado == "- viñeta uno\n- viñeta dos"
+        and isinstance(resultado, str)
+        and "Texto de prueba para el gate"
+        in modelo_falso.call_args_list[0].args[0].to_string()
+        and "punto uno" in modelo_falso.call_args_list[1].args[0].to_string()
+        and "texto sencillo"
+        in modelo_falso.call_args_list[2].args[0].to_string()
+    )
+    reporte.agregar(
+        "cadena_tres_pasos.py",
+        "Tres pasos con modelo simulado",
+        correcto,
+        (
+            "extrae, simplifica y formatea con tres invocaciones locales"
+            if correcto
+            else "la chain no conectó las tres etapas como se esperaba"
+        ),
+    )
+
+
 def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
     """Verifica los scripts de ejemplo sin enviar solicitudes a la red."""
     clave = "clave-local-de-prueba"
@@ -1309,31 +1371,37 @@ def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
     )
 
     modulo_main = modulos["main"]
-    with patch.object(
-        modulo_main, "obtener_dato_de_prueba", return_value="respuesta simulada"
-    ):
-        with redirect_stdout(StringIO()) as salida:
-            codigo_main = modulo_main.main()
+    with patch.object(modulo_main.cliente, "costo_total_sesion", 0.00008):
+        with patch.object(
+            modulo_main.cliente,
+            "consultar_modelo",
+            return_value="respuesta simulada",
+        ) as consulta:
+            with redirect_stdout(StringIO()) as salida:
+                codigo_main = modulo_main.main()
     main_ok = (
         codigo_main == 0
-        and "5 + 3 = 8" in salida.getvalue()
+        and consulta.call_count == 1
         and "respuesta simulada" in salida.getvalue()
+        and "Costo acumulado de la sesión: $0.00008" in salida.getvalue()
     )
     reporte.agregar(
         "main.py",
-        "Demostración simulada",
+        "Delegación al flujo principal",
         main_ok,
         (
-            "suma 5 + 3 y muestra la respuesta de Gemini"
+            "usa el cliente modular para una consulta y muestra su costo"
             if main_ok
-            else "la suma o el resultado de demostración no coincide"
+            else "no delegó correctamente en el cliente modular"
         ),
     )
 
     with patch.object(
-        modulo_main,
-        "obtener_dato_de_prueba",
-        side_effect=RuntimeError("fallo local simulado"),
+        modulo_main.cliente,
+        "consultar_modelo",
+        side_effect=modulo_main.cliente.ServicioNoDisponibleError(
+            "fallo local simulado"
+        ),
     ):
         with redirect_stdout(StringIO()):
             with redirect_stderr(StringIO()) as errores:
@@ -1343,10 +1411,10 @@ def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
     )
     reporte.agregar(
         "main.py",
-        "Manejo de error del cliente",
+        "Propagación de errores del cliente",
         main_error_ok,
         (
-            "muestra el fallo esperado en stderr y devuelve código 1"
+            "informa el error del cliente en stderr y devuelve código 1"
             if main_error_ok
             else "no comunicó correctamente el error del cliente"
         ),
@@ -1450,6 +1518,7 @@ def main() -> int:
         _revisar_banco_prompts(reporte, modulos)
         _revisar_pipeline_texto(reporte, modulos)
         _revisar_actividad_core(reporte, modulos)
+        _revisar_cadena_langchain(reporte, modulos)
         _revisar_scripts(reporte, modulos)
 
     print("\n5. DISPONIBILIDAD DE LA API")
