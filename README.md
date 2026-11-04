@@ -312,6 +312,35 @@ modelo, que pueden generar costo. Para probarla sin red ni credenciales:
 python -m pytest tests/test_cadena_tres_pasos.py -q
 ```
 
+## LangChain: enrutamiento condicional (Bloque 19)
+
+`src/GATE_1/enrutamiento.py` clasifica mensajes de soporte como `pregunta`,
+`queja` o `sugerencia`, normaliza la clasificación y dirige el mensaje a un
+prompt específico. La ruta de pregunta también es la ruta por defecto para
+categorías desconocidas. `construir_cadena(modelo)` permite probar el flujo con
+un modelo simulado; las funciones `construir_paso_clasificacion` y
+`construir_cadena_con_enrutamiento` permiten probar clasificación y rutas por
+separado.
+
+Para ejecutar un ejemplo con Gemini desde la raíz del proyecto:
+
+```console
+python -m src.GATE_1.enrutamiento
+```
+
+Requiere `GEMINI_API_KEY` en `.env` y realiza dos llamadas al modelo (una para
+clasificar y otra para responder), que pueden generar costo. Para comprobar
+las tres rutas, la ruta por defecto, la normalización y el flujo completo sin
+red ni credenciales:
+
+```console
+python -m pytest tests/test_orquestacion.py -q
+```
+
+El manejo de errores, el checklist completo y los casos de diagnóstico del
+Bloque 20 están documentados en
+[docs/bloque-20-manejo-errores-orquestacion.md](docs/bloque-20-manejo-errores-orquestacion.md).
+
 ## Revisar GATE_1
 
 Desde la raíz del repositorio ejecuta el verificador:
@@ -326,9 +355,9 @@ incluidas las de clasificación de errores, reintentos, backoff, costo por
 operación y validación de respuestas. También incorpora la revisión de
 `pipeline_texto.py`, `evaluar_salidas.py`, `evaluar_metricas.py` y
 `revisar_cualitativamente.py`; comprueba también la chain de tres pasos de
-LangChain usando un modelo simulado, sin llamar a Gemini. Reporta como pendiente
-la actividad core mientras falten los resultados, la revisión manual o los
-hallazgos documentados.
+LangChain y el enrutamiento condicional usando modelos simulados, sin llamar a
+Gemini. Reporta como pendiente la actividad core mientras falten los resultados,
+la revisión manual o los hallazgos documentados.
 
 Para ejecutar solo comprobaciones locales sin llamar a la API real:
 

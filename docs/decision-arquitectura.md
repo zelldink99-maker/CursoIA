@@ -169,6 +169,22 @@ el esquema JSON requerido, los límites de tokens, la cuota y el precio estén
 vigentes en la documentación y consola de Google AI para tu cuenta. La
 disponibilidad y los límites pueden variar por proyecto, región y fecha.
 
+## Flujo de enrutamiento de soporte
+
+El ejemplo educativo `src/GATE_1/enrutamiento.py` clasifica mensajes y los
+dirige a respuestas de queja, sugerencia o pregunta. Cada ruta usa
+`with_fallbacks` para devolver una respuesta útil si falla; la función
+`procesar_mensaje_seguro` registra con `logger.exception` y devuelve un mensaje
+seguro si ocurre un error fuera de esas rutas, como un fallo de clasificación.
+La suite `tests/test_orquestacion.py` simula las respuestas y los fallos, sin
+llamar a Gemini:
+
+```console
+python -m pytest tests/test_orquestacion.py
+```
+
+Este ejercicio es independiente del cliente de producción `cliente.py`.
+
 ## Comparación de modelos
 
 Se eliminó la comparación histórica de costos, latencias y calidad porque no
