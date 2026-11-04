@@ -60,6 +60,10 @@ MODULES = {
         "Encadena extracción, simplificación y formato con LangChain.",
         "Tres pasos usan StrOutputParser y permiten inyectar un modelo simulado.",
     ),
+    "enrutamiento.py": (
+        "Clasifica mensajes y los enruta a una respuesta según su categoría.",
+        "Normaliza la categoría, cubre tres rutas y usa pregunta como ruta por defecto.",
+    ),
     "cliente.py": (
         "Cliente modular con clasificación de errores y registro de costos.",
         "Devuelve texto, reintenta fallos transitorios y acumula el costo por operación.",
@@ -154,6 +158,7 @@ def _importar_modulos() -> dict[str, object]:
         cliente_reintento,
         consumir_gemini,
         costo,
+        enrutamiento,
         evaluar_metricas,
         evaluar_salidas,
         latencia,
@@ -174,6 +179,7 @@ def _importar_modulos() -> dict[str, object]:
         "cliente_reintento": cliente_reintento,
         "consumir_gemini": consumir_gemini,
         "costo": costo,
+        "enrutamiento": enrutamiento,
         "evaluar_metricas": evaluar_metricas,
         "evaluar_salidas": evaluar_salidas,
         "latencia": latencia,
@@ -1319,6 +1325,41 @@ def _revisar_cadena_langchain(
     )
 
 
+def _revisar_enrutamiento_langchain(
+    reporte: Reporte,
+    modulos: dict[str, object],
+) -> None:
+    """Prueba normalización y enrutamiento de una queja sin llamadas a Gemini."""
+    from langchain_core.messages import AIMessage
+
+    modelo_falso = Mock(return_value=AIMessage(content=" Queja \n"))
+    respuesta_falsa = Mock(return_value="respuesta empática")
+    paso = modulos["enrutamiento"].construir_paso_clasificacion(modelo_falso)
+    cadena = modulos["enrutamiento"].construir_cadena_con_enrutamiento(
+        paso_clasificacion=paso,
+        cadena_queja=respuesta_falsa,
+    )
+    resultado = cadena.invoke({"mensaje": "La app dejó de funcionar"})
+    entrada_ruta = respuesta_falsa.call_args.args[0]
+    correcto = (
+        resultado == "respuesta empática"
+        and modelo_falso.call_count == 1
+        and respuesta_falsa.call_count == 1
+        and entrada_ruta
+        == {"mensaje": "La app dejó de funcionar", "categoria": "queja"}
+    )
+    reporte.agregar(
+        "enrutamiento.py",
+        "Clasificación y ruta simuladas",
+        correcto,
+        (
+            "normaliza la clasificación, conserva el mensaje y elige la ruta de queja"
+            if correcto
+            else "la clasificación o la ruta no produjo el resultado esperado"
+        ),
+    )
+
+
 def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
     """Verifica los scripts de ejemplo sin enviar solicitudes a la red."""
     clave = "clave-local-de-prueba"
@@ -1519,6 +1560,7 @@ def main() -> int:
         _revisar_pipeline_texto(reporte, modulos)
         _revisar_actividad_core(reporte, modulos)
         _revisar_cadena_langchain(reporte, modulos)
+        _revisar_enrutamiento_langchain(reporte, modulos)
         _revisar_scripts(reporte, modulos)
 
     print("\n5. DISPONIBILIDAD DE LA API")
