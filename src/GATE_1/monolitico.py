@@ -10,6 +10,13 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
+if __package__:
+    from .costo import MODELO_TARIFADO
+else:
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from src.GATE_1.costo import MODELO_TARIFADO
+
 
 class GeminiError(Exception):
     """Error base para los problemas al consultar Gemini."""
@@ -52,8 +59,10 @@ def armar_peticion(
     if not isinstance(system_instruction, str) or not system_instruction.strip():
         raise ValueError("La instrucción del sistema debe ser un texto no vacío.")
 
-    modelo = "gemini-3.8-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{MODELO_TARIFADO}:generateContent"
+    )
     body = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"parts": [{"text": pregunta_usuario}]}],

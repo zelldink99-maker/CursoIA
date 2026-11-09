@@ -1,6 +1,7 @@
 # os permite leer variables de entorno; requests envía la petición HTTP;
 # json crea el cuerpo JSON; load_dotenv carga variables desde el archivo .env.
 import os
+import sys
 from pathlib import Path
 
 import requests
@@ -10,8 +11,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # Lee la configuración desde la raíz, aunque el script se ejecute desde otra carpeta.
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
+if __package__:
+    from .costo import MODELO_TARIFADO
+else:
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from src.GATE_1.costo import MODELO_TARIFADO
+
 # Endpoint del modelo que recibe la solicitud de generación de contenido.
-url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
+url = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{MODELO_TARIFADO}:generateContent"
+)
 
 
 def main() -> int:

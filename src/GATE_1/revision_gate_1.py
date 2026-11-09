@@ -64,6 +64,10 @@ MODULES = {
         "Clasifica mensajes y los enruta a una respuesta según su categoría.",
         "Normaliza la categoría, cubre tres rutas y usa pregunta como ruta por defecto.",
     ),
+    "agente_con_herramientas.py": (
+        "Agente de soporte con herramientas estructuradas y memoria por sesión.",
+        "Valida argumentos, conserva historial y separa sesiones de conversación.",
+    ),
     "cliente.py": (
         "Cliente modular con clasificación de errores y registro de costos.",
         "Devuelve texto, reintenta fallos transitorios y acumula el costo por operación.",
@@ -151,6 +155,7 @@ def _codigo_salida(reporte: Reporte) -> int:
 def _importar_modulos() -> dict[str, object]:
     """Importa módulos sin lanzar los scripts que hacen llamadas al importarse."""
     from src.GATE_1 import (
+        agente_con_herramientas,
         api_test,
         aritmetica,
         cadena_tres_pasos,
@@ -172,6 +177,7 @@ def _importar_modulos() -> dict[str, object]:
     from prompts import banco as banco_prompts
 
     return {
+        "agente_con_herramientas": agente_con_herramientas,
         "api_test": api_test,
         "aritmetica": aritmetica,
         "cadena_tres_pasos": cadena_tres_pasos,
@@ -252,7 +258,9 @@ def _revisar_dependencias(reporte: Reporte) -> None:
         "requests": "requests",
         "python-dotenv": "dotenv",
         "langchain": "langchain_core",
+        "langchain-classic": "langchain_classic",
         "langchain-google-genai": "langchain_google_genai",
+        "pydantic": "pydantic",
     }
     faltantes = [
         distribucion
@@ -271,8 +279,8 @@ def _revisar_dependencias(reporte: Reporte) -> None:
             "Entorno reproducible",
             "Dependencias",
             True,
-            "requests, python-dotenv y LangChain con el conector de Gemini "
-            "están declarados e instalados",
+            "requests, python-dotenv, LangChain, langchain-classic y el "
+            "conector de Gemini están declarados e instalados",
         )
 
     version_ok = sys.version_info >= (3, 10)
@@ -430,7 +438,7 @@ def _revisar_costo(reporte: Reporte, modulos: dict[str, object]) -> None:
     esperado = 850 * tarifa_entrada + (320 + 7) * tarifa_salida
     obtenido = modulos["costo"].calcular_costo(datos)
     tarifa_publicada_ok = (
-        modulos["costo"].MODELO_TARIFADO == "gemini-3.8-flash"
+        modulos["costo"].MODELO_TARIFADO == "gemini-3.5-flash"
         and modulos["costo"].PRECIO_ENTRADA_USD_POR_MILLON == 0.75
         and modulos["costo"].PRECIO_SALIDA_USD_POR_MILLON == 3.75
     )
@@ -1331,13 +1339,14 @@ def _revisar_enrutamiento_langchain(
 ) -> None:
     """Prueba normalización y enrutamiento de una queja sin llamadas a Gemini."""
     from langchain_core.messages import AIMessage
+    from langchain_core.runnables import RunnableLambda
 
     modelo_falso = Mock(return_value=AIMessage(content=" Queja \n"))
     respuesta_falsa = Mock(return_value="respuesta empática")
     paso = modulos["enrutamiento"].construir_paso_clasificacion(modelo_falso)
     cadena = modulos["enrutamiento"].construir_cadena_con_enrutamiento(
         paso_clasificacion=paso,
-        cadena_queja=respuesta_falsa,
+        cadena_queja=RunnableLambda(respuesta_falsa),
     )
     resultado = cadena.invoke({"mensaje": "La app dejó de funcionar"})
     entrada_ruta = respuesta_falsa.call_args.args[0]
@@ -1356,6 +1365,44 @@ def _revisar_enrutamiento_langchain(
             "normaliza la clasificación, conserva el mensaje y elige la ruta de queja"
             if correcto
             else "la clasificación o la ruta no produjo el resultado esperado"
+        ),
+    )
+
+
+def _revisar_agente_langchain(
+    reporte: Reporte,
+    modulos: dict[str, object],
+) -> None:
+    """Prueba herramientas estructuradas y memoria aislada sin llamadas al modelo."""
+    agente = modulos["agente_con_herramientas"]
+    resultado_documentacion = agente.buscar_en_documentacion.invoke("reintentos")
+    resultado_costo = agente.calcular_costo_tokens.invoke(
+        {"tokens_entrada": 1000, "tokens_salida": 200}
+    )
+    campos = agente.calcular_costo_tokens.args_schema.model_fields
+    historial_uno = agente.obtener_historial("revision-gate-bloque-22-uno")
+    historial_dos = agente.obtener_historial("revision-gate-bloque-22-dos")
+    historial_uno.add_user_message("mensaje privado de prueba")
+    correcto = (
+        "3 veces" in resultado_documentacion
+        and "USD 0.00150000" in resultado_costo
+        and "costo estimado" in resultado_costo.lower()
+        and agente.calcular_costo_tokens.name == "calcular_costo_tokens_gemini"
+        and set(campos)
+        == {"tokens_entrada", "tokens_salida", "tokens_pensamiento"}
+        and all(campo.description for campo in campos.values())
+        and historial_dos.messages == []
+    )
+    agente.cerrar_sesion("revision-gate-bloque-22-uno")
+    agente.cerrar_sesion("revision-gate-bloque-22-dos")
+    reporte.agregar(
+        "agente_con_herramientas.py",
+        "Herramienta estructurada y memoria",
+        correcto,
+        (
+            "el esquema documenta argumentos y los historiales quedan separados"
+            if correcto
+            else "falló la validación del esquema, herramienta o aislamiento de sesión"
         ),
     )
 
@@ -1561,6 +1608,7 @@ def main() -> int:
         _revisar_actividad_core(reporte, modulos)
         _revisar_cadena_langchain(reporte, modulos)
         _revisar_enrutamiento_langchain(reporte, modulos)
+        _revisar_agente_langchain(reporte, modulos)
         _revisar_scripts(reporte, modulos)
 
     print("\n5. DISPONIBILIDAD DE LA API")
