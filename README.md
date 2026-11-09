@@ -341,6 +341,69 @@ El manejo de errores, el checklist completo y los casos de diagnóstico del
 Bloque 20 están documentados en
 [docs/bloque-20-manejo-errores-orquestacion.md](docs/bloque-20-manejo-errores-orquestacion.md).
 
+## LangChain: primer agente con herramientas (Bloque 21)
+
+`src/GATE_1/agente_con_herramientas.py` construye un agente de soporte con dos
+herramientas: búsqueda de documentación del proyecto y estimación del costo
+por tokens usando `src/GATE_1/costo.py`. A diferencia de la chain enrutada del
+Bloque 19, el modelo decide si responde directamente o qué herramienta invocar.
+El agente conserva las acciones y observaciones en `intermediate_steps`.
+
+La guía conceptual, la ejecución, la revisión de la traza y los errores comunes
+están en
+[docs/bloque-21-agente-con-herramientas.md](docs/bloque-21-agente-con-herramientas.md).
+El módulo requiere `langchain-classic` además de las dependencias del proyecto.
+Instálalas con `python -m pip install -r requirements.txt`; configura
+`GEMINI_API_KEY` en `.env` y ejecuta desde la raíz:
+
+```console
+python -m src.GATE_1.agente_con_herramientas
+```
+
+La ejecución usa Gemini y puede generar costos. Las pruebas usan un modelo
+simulado y no requieren credenciales ni conexión:
+
+```console
+python -m pytest tests/test_agente_con_herramientas.py -q
+```
+
+## LangChain: herramienta estructurada y memoria (Bloque 22)
+
+El agente también valida los argumentos del cálculo de tokens mediante un
+`args_schema` de Pydantic 2, con descripciones por campo y el nombre explícito
+`calcular_costo_tokens_gemini`. `RunnableWithMessageHistory` conserva contexto
+entre turnos y separa conversaciones por `session_id`. Los historiales se
+mantienen en memoria durante el proceso y no persisten al reiniciarlo;
+`cerrar_sesion(session_id)` elimina una conversación.
+La versión actual de LangChain puede mostrar avisos de obsolescencia para esta
+API de memoria; la guía explica ese alcance.
+
+El ejemplo ejecutable hace dos turnos en una sesión compartida, por lo que
+requiere `GEMINI_API_KEY` y puede generar costos. Las pruebas del comando
+anterior verifican la validación del esquema, la memoria y el aislamiento de
+sesiones sin llamar a Gemini. Consulta la guía en
+[docs/bloque-22-herramienta-estructurada-memoria.md](docs/bloque-22-herramienta-estructurada-memoria.md).
+
+## LangChain: autonomía y revisión de trazas (Bloque 23)
+
+El agente guarda las entradas, herramientas, argumentos, observaciones y
+respuestas en `trazas_agente.jsonl`. Como sus herramientas actuales solo
+consultan o calculan, no requieren aprobación humana; la guía documenta esos
+niveles de riesgo, cómo revisar las trazas y qué hacer si el agente se desvía.
+
+Consulta [docs/bloque-23-autonomia-y-trazas.md](docs/bloque-23-autonomia-y-trazas.md)
+y ejecuta el analizador desde la raíz:
+
+```console
+python -c "from src.GATE_1.trazas_agente import marcar_repeticiones_sospechosas; marcar_repeticiones_sospechosas()"
+```
+
+Las pruebas del registro y el análisis no llaman a Gemini:
+
+```console
+python -m pytest tests/test_trazas_agente.py -q
+```
+
 ## Revisar GATE_1
 
 Desde la raíz del repositorio ejecuta el verificador:
@@ -355,9 +418,11 @@ incluidas las de clasificación de errores, reintentos, backoff, costo por
 operación y validación de respuestas. También incorpora la revisión de
 `pipeline_texto.py`, `evaluar_salidas.py`, `evaluar_metricas.py` y
 `revisar_cualitativamente.py`; comprueba también la chain de tres pasos de
-LangChain y el enrutamiento condicional usando modelos simulados, sin llamar a
-Gemini. Reporta como pendiente la actividad core mientras falten los resultados,
-la revisión manual o los hallazgos documentados.
+LangChain y el enrutamiento condicional usando modelos simulados, además de las
+herramientas estructuradas del agente y el aislamiento de sesiones sin invocar
+el modelo. Estas comprobaciones locales no llaman a Gemini. Reporta como
+pendiente la actividad core mientras falten los
+resultados, la revisión manual o los hallazgos documentados.
 
 Para ejecutar solo comprobaciones locales sin llamar a la API real:
 
@@ -400,6 +465,18 @@ la respuesta es consistente entre varios intentos.
 - incorporar métricas más avanzadas de evaluación de salidas y calidad del texto.
 
 ## Changelog
+
+### Corregir el historial del agente ante respuestas estructuradas de Gemini (2026-11-09)
+
+- Se normaliza la respuesta final del agente antes de guardarla en la memoria:
+  los bloques `type=text` de Gemini se concatenan como texto para que el
+  siguiente turno pueda reconstruir el historial correctamente.
+- El agente informa explícitamente si recibe un formato de salida no compatible,
+  en lugar de fallar después al preparar los mensajes del historial.
+- Se agregó una prueba de regresión local que simula la respuesta estructurada y
+  verifica dos turnos en una misma sesión. Validación: `python -m pytest -q`
+  completó con 87 pruebas pasadas; permanecen avisos de obsolescencia de las
+  APIs de memoria de LangChain.
 
 ### Depurar y consolidar scripts redundantes en la raíz para dejar un único flujo principal de producción
 

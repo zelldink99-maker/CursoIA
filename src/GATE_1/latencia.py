@@ -6,14 +6,22 @@ import time
 from numbers import Real
 from typing import Any
 
-# Estos módulos se importan desde el directorio GATE_1 al ejecutar este script.
-from costo import (
-    MODELO_TARIFADO,
-    PRECIO_ENTRADA_POR_TOKEN,
-    PRECIO_SALIDA_POR_TOKEN,
-    calcular_costo,
-)
-from monolitico import GeminiError, armar_peticion, enviar_peticion
+if __package__:
+    from .costo import (
+        MODELO_TARIFADO,
+        PRECIO_ENTRADA_POR_TOKEN,
+        PRECIO_SALIDA_POR_TOKEN,
+        calcular_costo,
+    )
+    from .monolitico import GeminiError, armar_peticion, enviar_peticion
+else:
+    from costo import (
+        MODELO_TARIFADO,
+        PRECIO_ENTRADA_POR_TOKEN,
+        PRECIO_SALIDA_POR_TOKEN,
+        calcular_costo,
+    )
+    from monolitico import GeminiError, armar_peticion, enviar_peticion
 
 PRECIO_ENTRADA = PRECIO_ENTRADA_POR_TOKEN
 PRECIO_SALIDA = PRECIO_SALIDA_POR_TOKEN
