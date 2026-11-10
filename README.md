@@ -404,6 +404,36 @@ Las pruebas del registro y el análisis no llaman a Gemini:
 python -m pytest tests/test_trazas_agente.py -q
 ```
 
+## RAG: indexación del corpus y embeddings (Bloque 24)
+
+`src/GATE_1/indexar_corpus.py` divide cinco documentos cortos del proyecto con
+`RecursiveCharacterTextSplitter`, los vectoriza con `gemini-embedding-001` y
+persiste los chunks en Chroma bajo `vectorstore/`. La carpeta generada está
+excluida de Git. La indexación y la búsqueda semántica hacen llamadas reales a
+Gemini; asegúrate de tener `GEMINI_API_KEY` en `.env`.
+
+Instala las dependencias actualizadas y corre el indexador desde la raíz:
+
+```console
+python -m pip install -r requirements.txt
+python -m src.GATE_1.indexar_corpus
+```
+
+El indexador informa el chunking y la indexación, lista los archivos creados
+en `vectorstore/` y vuelve a conectarse para confirmar el total persistido
+(cinco chunks en el corpus de ejemplo). La guía también incluye cómo reiniciar
+Python y comprobar el total con `vectorstore._collection.count()` sin volver a
+indexar.
+
+La guía de chunking, persistencia, reconexión y solución de problemas está en
+[docs/bloque-24-indexacion-corpus-rag.md](docs/bloque-24-indexacion-corpus-rag.md).
+Las pruebas usan embeddings deterministas locales para verificar Chroma sin
+llamadas a Gemini:
+
+```console
+python -m pytest tests/test_indexar_corpus.py -q
+```
+
 ## Revisar GATE_1
 
 Desde la raíz del repositorio ejecuta el verificador:
@@ -465,6 +495,21 @@ la respuesta es consistente entre varios intentos.
 - incorporar métricas más avanzadas de evaluación de salidas y calidad del texto.
 
 ## Changelog
+
+### Agregar indexación RAG con Chroma persistente (2026-11-09)
+
+- Se agregó un corpus del proyecto de cinco fuentes y chunking recursivo con
+  metadatos `source` y `chunk_index`.
+- Se añadió la indexación con `gemini-embedding-001` y Chroma persistido en
+  `vectorstore/`; los IDs estables evitan duplicados al reindexar y se limpian
+  chunks obsoletos de las fuentes del corpus.
+- Se declaró `langchain-chroma` y se excluyó el índice regenerable de Git.
+- Se agregaron pruebas locales de persistencia y recarga usando embeddings
+  deterministas sin conexión a Gemini, y documentación del Bloque 24.
+- Validación: 95 pruebas pasaron y `pip check` no detectó dependencias rotas.
+  También se confirmó la ejecución real del indexador: `vectorstore/` contiene
+  los archivos de Chroma y una reconexión desde un proceso nuevo devuelve
+  `count() == 5`.
 
 ### Corregir el historial del agente ante respuestas estructuradas de Gemini (2026-11-09)
 
