@@ -68,6 +68,10 @@ MODULES = {
         "Agente de soporte con herramientas estructuradas y memoria por sesión.",
         "Valida argumentos, conserva historial y separa sesiones de conversación.",
     ),
+    "indexar_corpus.py": (
+        "Divide e indexa documentación en un vector store Chroma persistente.",
+        "Crea al menos cinco chunks con metadatos y permite reconectar al índice.",
+    ),
     "cliente.py": (
         "Cliente modular con clasificación de errores y registro de costos.",
         "Devuelve texto, reintenta fallos transitorios y acumula el costo por operación.",
@@ -166,6 +170,7 @@ def _importar_modulos() -> dict[str, object]:
         enrutamiento,
         evaluar_metricas,
         evaluar_salidas,
+        indexar_corpus,
         latencia,
         main,
         module_test,
@@ -188,6 +193,7 @@ def _importar_modulos() -> dict[str, object]:
         "enrutamiento": enrutamiento,
         "evaluar_metricas": evaluar_metricas,
         "evaluar_salidas": evaluar_salidas,
+        "indexar_corpus": indexar_corpus,
         "latencia": latencia,
         "main": main,
         "module_test": module_test,
@@ -260,6 +266,8 @@ def _revisar_dependencias(reporte: Reporte) -> None:
         "langchain": "langchain_core",
         "langchain-classic": "langchain_classic",
         "langchain-google-genai": "langchain_google_genai",
+        "langchain-chroma": "langchain_chroma",
+        "chromadb": "chromadb",
         "pydantic": "pydantic",
     }
     faltantes = [
@@ -279,8 +287,8 @@ def _revisar_dependencias(reporte: Reporte) -> None:
             "Entorno reproducible",
             "Dependencias",
             True,
-            "requests, python-dotenv, LangChain, langchain-classic y el "
-            "conector de Gemini están declarados e instalados",
+            "requests, python-dotenv, LangChain, langchain-classic y los "
+            "conectores de Gemini y Chroma están declarados e instalados",
         )
 
     version_ok = sys.version_info >= (3, 10)
@@ -1407,6 +1415,36 @@ def _revisar_agente_langchain(
     )
 
 
+def _revisar_chunking_rag(
+    reporte: Reporte,
+    modulos: dict[str, object],
+) -> None:
+    """Comprueba localmente que el corpus se divida con metadatos de origen."""
+    indexador = modulos["indexar_corpus"]
+    chunks = indexador.dividir_corpus()
+    correcto = (
+        len(indexador.CORPUS_DOCUMENTOS) >= 5
+        and len(chunks) >= 5
+        and all(chunk.page_content.strip() for chunk in chunks)
+        and all(chunk.metadata.get("source") for chunk in chunks)
+        and all(
+            len(chunk.page_content) <= indexador.TAMANO_CHUNK
+            for chunk in chunks
+        )
+    )
+    reporte.agregar(
+        "indexar_corpus.py",
+        "Chunking local del corpus RAG",
+        correcto,
+        (
+            f"{len(indexador.CORPUS_DOCUMENTOS)} documentos producen "
+            f"{len(chunks)} chunks con origen"
+            if correcto
+            else "el corpus o los metadatos de los chunks no cumplen los requisitos"
+        ),
+    )
+
+
 def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
     """Verifica los scripts de ejemplo sin enviar solicitudes a la red."""
     clave = "clave-local-de-prueba"
@@ -1609,6 +1647,7 @@ def main() -> int:
         _revisar_cadena_langchain(reporte, modulos)
         _revisar_enrutamiento_langchain(reporte, modulos)
         _revisar_agente_langchain(reporte, modulos)
+        _revisar_chunking_rag(reporte, modulos)
         _revisar_scripts(reporte, modulos)
 
     print("\n5. DISPONIBILIDAD DE LA API")
