@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda
+
+from .configuracion import crear_chat_modelo
 
 
 def _envolver_puntos(puntos: str) -> dict[str, str]:
@@ -53,13 +54,7 @@ def construir_cadena(modelo: Runnable[Any, Any]) -> Runnable[Any, str]:
 
 def main() -> int:
     """Ejecuta la chain de ejemplo; requiere credenciales y puede costar."""
-    from dotenv import load_dotenv
-    from langchain_google_genai import ChatGoogleGenerativeAI
-
-    project_root = Path(__file__).resolve().parents[2]
-    load_dotenv(dotenv_path=project_root / ".env")
-
-    modelo = ChatGoogleGenerativeAI(model="gemini-3.5-flash")
+    modelo = crear_chat_modelo()
     cadena = construir_cadena(modelo)
     texto = (
         "Los modelos de lenguaje procesan el texto dividiéndolo en tokens. "

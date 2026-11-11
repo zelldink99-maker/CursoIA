@@ -5,23 +5,20 @@ import sys
 from pathlib import Path
 
 import requests
-from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-# Lee la configuración desde la raíz, aunque el script se ejecute desde otra carpeta.
-load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
 if __package__:
-    from .costo import MODELO_TARIFADO
+    from .configuracion import modeloIA
 else:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
-    from src.GATE_1.costo import MODELO_TARIFADO
+    from src.GATE_1.configuracion import modeloIA
 
 # Endpoint del modelo que recibe la solicitud de generación de contenido.
 url = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
-    f"{MODELO_TARIFADO}:generateContent"
+    f"{modeloIA}:generateContent"
 )
 
 

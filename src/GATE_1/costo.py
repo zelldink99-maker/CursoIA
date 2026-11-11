@@ -4,6 +4,8 @@ import math
 from numbers import Real
 from typing import TypedDict
 
+from .configuracion import modeloIA
+
 
 class MetadatosUso(TypedDict):
     """Contadores de tokens incluidos en la respuesta de la API."""
@@ -25,7 +27,7 @@ class DatosRespuesta(TypedDict):
     usageMetadata: MetadatosUsoConPensamiento
 
 
-MODELO_TARIFADO = "gemini-3.8-flash"
+MODELO_TARIFADO = modeloIA
 PRECIO_ENTRADA_USD_POR_MILLON = 0.75
 PRECIO_SALIDA_USD_POR_MILLON = 3.75
 PRECIO_ENTRADA_POR_TOKEN = PRECIO_ENTRADA_USD_POR_MILLON / 1_000_000

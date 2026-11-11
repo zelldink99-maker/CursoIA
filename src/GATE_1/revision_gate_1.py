@@ -18,7 +18,6 @@ from unittest.mock import Mock, patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 GATE_DIR = Path(__file__).resolve().parent
-MODEL = "gemini-3.5-flash"
 # Permite importar el paquete cuando el verificador se inicia desde cualquier carpeta.
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -71,6 +70,14 @@ MODULES = {
     "indexar_corpus.py": (
         "Divide e indexa documentación en un vector store Chroma persistente.",
         "Crea al menos cinco chunks con metadatos y permite reconectar al índice.",
+    ),
+    "configuracion.py": (
+        "Carga y valida el modelo Gemini compartido desde la variable modeloIA.",
+        "Todos los clientes usan el mismo modelo seleccionado en .env.",
+    ),
+    "replica_corpus_ejemplo.py": (
+        "Replica el chunking y la indexación de un corpus de devoluciones aislado.",
+        "Produce cinco chunks íntegros de 490 caracteres antes de llamar a Gemini.",
     ),
     "cliente.py": (
         "Cliente modular con clasificación de errores y registro de costos.",
@@ -166,6 +173,7 @@ def _importar_modulos() -> dict[str, object]:
         cliente,
         cliente_reintento,
         consumir_gemini,
+        configuracion,
         costo,
         enrutamiento,
         evaluar_metricas,
@@ -177,6 +185,7 @@ def _importar_modulos() -> dict[str, object]:
         monolitico,
         peticiones,
         pipeline_texto,
+        replica_corpus_ejemplo,
         revisar_cualitativamente,
     )
     from prompts import banco as banco_prompts
@@ -189,6 +198,7 @@ def _importar_modulos() -> dict[str, object]:
         "cliente": cliente,
         "cliente_reintento": cliente_reintento,
         "consumir_gemini": consumir_gemini,
+        "configuracion": configuracion,
         "costo": costo,
         "enrutamiento": enrutamiento,
         "evaluar_metricas": evaluar_metricas,
@@ -200,6 +210,7 @@ def _importar_modulos() -> dict[str, object]:
         "monolitico": monolitico,
         "peticiones": peticiones,
         "pipeline_texto": pipeline_texto,
+        "replica_corpus_ejemplo": replica_corpus_ejemplo,
         "revisar_cualitativamente": revisar_cualitativamente,
         "banco_prompts": banco_prompts,
     }
@@ -266,6 +277,7 @@ def _revisar_dependencias(reporte: Reporte) -> None:
         "langchain": "langchain_core",
         "langchain-classic": "langchain_classic",
         "langchain-google-genai": "langchain_google_genai",
+        "langchain-text-splitters": "langchain_text_splitters",
         "langchain-chroma": "langchain_chroma",
         "chromadb": "chromadb",
         "pydantic": "pydantic",
@@ -288,7 +300,8 @@ def _revisar_dependencias(reporte: Reporte) -> None:
             "Dependencias",
             True,
             "requests, python-dotenv, LangChain, langchain-classic y los "
-            "conectores de Gemini y Chroma están declarados e instalados",
+            "conectores de Gemini, text-splitters y Chroma están declarados "
+            "e instalados",
         )
 
     version_ok = sys.version_info >= (3, 10)
@@ -446,7 +459,8 @@ def _revisar_costo(reporte: Reporte, modulos: dict[str, object]) -> None:
     esperado = 850 * tarifa_entrada + (320 + 7) * tarifa_salida
     obtenido = modulos["costo"].calcular_costo(datos)
     tarifa_publicada_ok = (
-        modulos["costo"].MODELO_TARIFADO == "gemini-3.5-flash"
+        modulos["costo"].MODELO_TARIFADO
+        in modulos["configuracion"].MODELOS_IA_PERMITIDOS
         and modulos["costo"].PRECIO_ENTRADA_USD_POR_MILLON == 0.75
         and modulos["costo"].PRECIO_SALIDA_USD_POR_MILLON == 3.75
     )
@@ -1445,6 +1459,36 @@ def _revisar_chunking_rag(
     )
 
 
+def _revisar_replica_corpus_ejemplo(
+    reporte: Reporte,
+    modulos: dict[str, object],
+) -> None:
+    """Comprueba localmente el chunking de la réplica sin llamar a Gemini."""
+    replica = modulos["replica_corpus_ejemplo"]
+    chunks = replica.dividir_corpus()
+    with redirect_stdout(StringIO()):
+        replica.verificar_integridad(chunks)
+
+    longitudes = [len(chunk.page_content) for chunk in chunks]
+    correcto = (
+        len(chunks) == 5
+        and longitudes == [106, 103, 99, 85, 97]
+        and sum(longitudes) == 490
+    )
+    reporte.agregar(
+        "replica_corpus_ejemplo.py",
+        "Integridad local del corpus de ejemplo",
+        correcto,
+        (
+            f"{len(chunks)} chunks, {sum(longitudes)} caracteres y sin llamadas "
+            "a Gemini"
+            if correcto
+            else "el número, longitudes o total de caracteres no coincide "
+            "con el corpus de ejemplo"
+        ),
+    )
+
+
 def _revisar_scripts(reporte: Reporte, modulos: dict[str, object]) -> None:
     """Verifica los scripts de ejemplo sin enviar solicitudes a la red."""
     clave = "clave-local-de-prueba"
@@ -1648,6 +1692,7 @@ def main() -> int:
         _revisar_enrutamiento_langchain(reporte, modulos)
         _revisar_agente_langchain(reporte, modulos)
         _revisar_chunking_rag(reporte, modulos)
+        _revisar_replica_corpus_ejemplo(reporte, modulos)
         _revisar_scripts(reporte, modulos)
 
     print("\n5. DISPONIBILIDAD DE LA API")

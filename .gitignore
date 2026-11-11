@@ -21,3 +21,4 @@ Thumbs.db
 *.log
 trazas_agente.jsonl
 vectorstore/
+vectorstore_ejemplo/

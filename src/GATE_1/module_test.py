@@ -6,11 +6,21 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if __package__:
+    from .configuracion import modeloIA
+else:
+    import sys
+
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from src.GATE_1.configuracion import modeloIA
+
 # Importa las funciones que preparan la petición y la que la envía a Gemini.
 from peticiones import create_headers, create_payload, make_request
 
 # Obtiene la ruta raíz del proyecto y apunta al archivo .env.
-env_path = Path(__file__).resolve().parents[2] / ".env"
+env_path = PROJECT_ROOT / ".env"
 # Mantiene el comportamiento del ejemplo: los valores del archivo prevalecen.
 load_dotenv(dotenv_path=env_path, override=True)
 
@@ -25,7 +35,10 @@ def main() -> int:
 
     # Reutiliza las funciones del módulo hermano para preparar y enviar la petición.
     result = make_request(
-        url="https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+        url=(
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{modeloIA}:generateContent"
+        ),
         headers=create_headers(api_key),
         payload=create_payload("Explícame cómo funciona la NBA en 20 palabras"),
     )

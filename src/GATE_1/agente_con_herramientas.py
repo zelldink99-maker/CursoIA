@@ -20,6 +20,7 @@ from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from pydantic import BaseModel, Field
 
 if __package__:
+    from .configuracion import crear_chat_modelo
     from .costo import (
         PRECIO_ENTRADA_POR_TOKEN,
         PRECIO_SALIDA_POR_TOKEN,
@@ -30,6 +31,7 @@ else:
     project_root = Path(__file__).resolve().parents[2]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
+    from src.GATE_1.configuracion import crear_chat_modelo
     from src.GATE_1.costo import (
         PRECIO_ENTRADA_POR_TOKEN,
         PRECIO_SALIDA_POR_TOKEN,
@@ -217,13 +219,9 @@ def construir_agente_con_memoria(
 
 def main() -> int:
     """Ejecuta un ejemplo real; requiere credenciales y puede generar costo."""
-    from dotenv import load_dotenv
-    from langchain_google_genai import ChatGoogleGenerativeAI
-
     project_root = Path(__file__).resolve().parents[2]
-    load_dotenv(dotenv_path=project_root / ".env")
 
-    modelo = ChatGoogleGenerativeAI(model="gemini-3.5-flash")
+    modelo = crear_chat_modelo()
     ejecutor = construir_ejecutor_agente(modelo, verbose=True)
     agente_con_memoria = construir_agente_con_memoria(ejecutor)
     config = {"configurable": {"session_id": "demostracion-bloque-22"}}
