@@ -76,10 +76,10 @@ también el rastro programático:
 
 ```python
 from src.GATE_1.agente_con_herramientas import construir_ejecutor_agente
-from langchain_google_genai import ChatGoogleGenerativeAI
+from src.GATE_1.configuracion import crear_chat_modelo
 
 agente = construir_ejecutor_agente(
-    ChatGoogleGenerativeAI(model="gemini-3.8-flash"),
+    crear_chat_modelo(),
     verbose=True,
 )
 

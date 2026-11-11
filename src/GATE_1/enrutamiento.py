@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Any
 
 from langchain_core.output_parsers import StrOutputParser
@@ -14,6 +13,8 @@ from langchain_core.runnables import (
     RunnableLambda,
     RunnablePassthrough,
 )
+
+from .configuracion import crear_chat_modelo
 
 logger = logging.getLogger(__name__)
 
@@ -136,13 +137,7 @@ def construir_cadena(modelo: Runnable[Any, Any]) -> Runnable[Any, str]:
 
 def main() -> int:
     """Ejecuta un ejemplo real; requiere credenciales y puede costar."""
-    from dotenv import load_dotenv
-    from langchain_google_genai import ChatGoogleGenerativeAI
-
-    project_root = Path(__file__).resolve().parents[2]
-    load_dotenv(dotenv_path=project_root / ".env")
-
-    modelo = ChatGoogleGenerativeAI(model="gemini-3.5-flash")
+    modelo = crear_chat_modelo()
     cadena = construir_cadena(modelo)
     print(procesar_mensaje_seguro(cadena, "La app se cierra al subir una foto."))
     return 0

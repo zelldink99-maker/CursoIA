@@ -4,18 +4,16 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
 
 # La ruta absoluta permite cargar la configuración sin depender del directorio actual.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
 if __package__:
-    from .costo import MODELO_TARIFADO
+    from .configuracion import modeloIA
 else:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
-    from src.GATE_1.costo import MODELO_TARIFADO
+    from src.GATE_1.configuracion import modeloIA
 
 
 class GeminiError(Exception):
@@ -61,7 +59,7 @@ def armar_peticion(
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{MODELO_TARIFADO}:generateContent"
+        f"{modeloIA}:generateContent"
     )
     body = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},

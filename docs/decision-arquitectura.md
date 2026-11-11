@@ -3,14 +3,24 @@
 ## Modelo elegido
 
 El flujo principal de producción es `src/GATE_1/cliente.py`, que usa
-`src/GATE_1/monolitico.py` como transporte y consulta **Gemini 3.8 Flash**
-(`gemini-3.8-flash`). El transporte acepta una instrucción del sistema en cada
+`src/GATE_1/monolitico.py` como transporte y consulta el modelo seleccionado en
+`modeloIA`, definido en `.env`. El valor predeterminado es **Gemini 3.8 Flash**
+(`gemini-3.8-flash`); también se admite `gemini-3.5-flash`. La variable se
+carga y valida en `src/GATE_1/configuracion.py`, compartida por los clientes
+HTTP y LangChain. El transporte acepta una instrucción del sistema en cada
 solicitud. `consumir_gemini.py` mantiene la interfaz anterior, pero delega
 todas las consultas en este cliente principal.
 
-El cliente de latencia y del banco de prompts fija la tarifa de Gemini 3.8 Flash
-descrita más adelante. No se incluyen comparaciones de latencia o calidad porque
-el repositorio no conserva mediciones reproducibles para otros modelos.
+Para cambiar el modelo, establece `modeloIA=gemini-3.5-flash` o
+`modeloIA=gemini-3.8-flash` en `.env` y reinicia el proceso. Si la variable no
+está definida, se usa `gemini-3.8-flash`. El módulo valida el valor y rechaza
+configuraciones fuera de esas dos opciones.
+
+El estimador de costos usa las tarifas de Gemini 3.8 Flash descritas más
+adelante. Cambiar `modeloIA` a 3.5 no cambia esas constantes; verifica y
+actualiza los precios antes de interpretar el costo como estimación de ese
+modelo. No se incluyen comparaciones de latencia o calidad porque el repositorio
+no conserva mediciones reproducibles para otros modelos.
 
 El módulo `src/GATE_1/cliente.py` compone `monolitico.py` con
 `cliente_reintento.py`: clasifica 401/403 como errores no reintentables y 429,
@@ -76,7 +86,7 @@ rechazos localmente sin realizar solicitudes a Gemini.
 
 ## Medición de latencia y estimación de costo
 
-La clase `Latencia`, en `src/GATE_1/latencia.py`, realiza cuatro solicitudes de prueba por defecto usando `gemini-3.8-flash` mediante las funciones de `src/GATE_1/monolitico.py`. Imprime el tiempo de cada solicitud, el promedio y estima el costo de la última respuesta con `calcular_costo`, de `src/GATE_1/costo.py`. La prueba se ejecuta al lanzar el módulo o llamar `Latencia.ejecutar()`; importarlo no realiza solicitudes.
+La clase `Latencia`, en `src/GATE_1/latencia.py`, realiza cuatro solicitudes de prueba por defecto usando el modelo definido por `modeloIA` mediante las funciones de `src/GATE_1/monolitico.py`. Imprime el tiempo de cada solicitud, el promedio y estima el costo de la última respuesta con `calcular_costo`, de `src/GATE_1/costo.py`. La prueba se ejecuta al lanzar el módulo o llamar `Latencia.ejecutar()`; importarlo no realiza solicitudes.
 
 `enviar_peticion` conserva el JSON completo de Gemini, incluidos los metadatos
 `usageMetadata` cuando están presentes. La función auxiliar de diagnóstico en
@@ -96,7 +106,8 @@ estimado para esa respuesta.
 
 ## Precios oficiales y cálculo de costo
 
-El cálculo del proyecto usa la tarifa **Standard de pago** publicada por Google
+Para el modelo predeterminado, el cálculo del proyecto usa la tarifa **Standard
+de pago** publicada por Google
 para Gemini 3.8 Flash: **USD 0,75 por millón de tokens de entrada** y
 **USD 3,75 por millón de tokens de salida** (incluye tokens de pensamiento).
 Equivale a USD 0,00000075 y USD 0,00000375 por token, respectivamente. Son

@@ -56,7 +56,9 @@ Copy-Item .env.example .env
 ```
 
 En todos los sistemas, edita `.env` y reemplaza `tu_llave_aqui` por tu clave
-real de Gemini. No compartas ni subas ese archivo: `.gitignore` lo excluye.
+real de Gemini. Define también `modeloIA=gemini-3.8-flash` (o
+`modeloIA=gemini-3.5-flash`) para seleccionar el modelo compartido por los
+clientes del proyecto. No compartas ni subas ese archivo: `.gitignore` lo excluye.
 Cuando termines de trabajar, puedes salir del entorno virtual con `deactivate`.
 
 > **Importante:** no instales paquetes con `pip install dotenv` ni directamente
@@ -82,9 +84,10 @@ python src/GATE_1/latencia.py
 
 La clase `Latencia`, definida en `src/GATE_1/latencia.py`, realiza cuatro
 solicitudes con la pregunta de prueba predeterminada. Informa el tiempo de cada
-solicitud, el promedio y una estimación del costo de la última respuesta usando
-el precio oficial vigente de Gemini 3.8 Flash. Ejecuta el archivo directamente
-como se muestra; no uses `-m src.GATE_1.latencia`, ya que sus imports de módulos
+solicitud, el promedio y una estimación del costo de la última respuesta.
+Todos los clientes leen el modelo de `modeloIA` en `.env`; el valor
+predeterminado es `gemini-3.8-flash`. Ejecuta el archivo directamente como se
+muestra; no uses `-m src.GATE_1.latencia`, ya que sus imports de módulos
 hermanos no están configurados para la ejecución como módulo de paquete.
 
 ## Consultar tokens de una respuesta
@@ -97,8 +100,12 @@ modelo en el flujo de producción, usa `src/GATE_1/cliente.py`, que aplica
 reintentos y registra el costo con los metadatos de uso.
 
 El módulo `src/GATE_1/costo.py` calcula el costo a partir del uso reportado y
-los precios oficiales de Gemini 3.8 Flash. La tarifa utilizada y sus condiciones
-están documentadas en [la decisión de arquitectura](docs/decision-arquitectura.md#precios-oficiales-y-cálculo-de-costo).
+los precios oficiales documentados para Gemini 3.8 Flash. Si seleccionas otro
+modelo en `modeloIA`, verifica y actualiza primero sus tarifas: el estimador usa
+las constantes actuales de 3.8 Flash. Consulta
+[la decisión de arquitectura](docs/decision-arquitectura.md#precios-oficiales-y-cálculo-de-costo).
+El modelo aceptado y el factory común de LangChain se prueban sin red con
+`python -m pytest tests/test_configuracion.py -q`.
 
 ## Cliente modular: reintentos y costo por operación
 
@@ -433,6 +440,26 @@ llamadas a Gemini:
 ```console
 python -m pytest tests/test_indexar_corpus.py -q
 ```
+
+La réplica guiada del Bloque 25 usa una colección y carpeta diferentes para no
+mezclarse con el corpus del proyecto. Su guía contiene los pasos, el resultado
+esperado y el troubleshooting de instalaciones, clave, cuota, persistencia y
+colecciones. Para ejecutarla con Gemini:
+
+```console
+python -m src.GATE_1.replica_corpus_ejemplo
+```
+
+La ejecución requiere una clave válida en `.env` y puede consumir cuota de la
+API. Las comprobaciones automatizadas usan embeddings deterministas y no llaman
+a Gemini:
+
+```console
+python -m pytest tests/test_replica_corpus_ejemplo.py -q
+```
+
+Consulta [docs/bloque-25-replica-corpus-ejemplo.md](docs/bloque-25-replica-corpus-ejemplo.md)
+para los pasos detallados y la guía de troubleshooting de vector stores.
 
 ## Revisar GATE_1
 

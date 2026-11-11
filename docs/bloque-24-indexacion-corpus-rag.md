@@ -109,6 +109,9 @@ python src/GATE_1/revision_gate_1.py --omitir-api
   incluyen SQLite anterior a la versión que requiere Chroma. Actualiza el
   SQLite del entorno de Python siguiendo la documentación de Chroma para tu
   plataforma antes de aplicar parches de importación al proceso.
+- **Diagnóstico por etapa:** la guía consolidada de instalación, cuota,
+  persistencia y consistencia del índice está en
+  [docs/bloque-25-replica-corpus-ejemplo.md](./bloque-25-replica-corpus-ejemplo.md).
 
 ## Alcance y límites
 
