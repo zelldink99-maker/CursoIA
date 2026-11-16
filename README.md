@@ -461,6 +461,60 @@ python -m pytest tests/test_replica_corpus_ejemplo.py -q
 Consulta [docs/bloque-25-replica-corpus-ejemplo.md](docs/bloque-25-replica-corpus-ejemplo.md)
 para los pasos detallados y la guía de troubleshooting de vector stores.
 
+### Bloque 26: recuperar contexto y responder con citas
+
+`src/GATE_1/recuperacion_citas.py` reindexa el corpus del proyecto con sus
+metadatos, recupera los fragmentos pertinentes y consulta el modelo configurado
+por `modeloIA`. El prompt limita la respuesta al contexto y solicita citas
+numeradas; el script imprime las rutas fuente asociadas a cada número.
+
+```console
+python -m src.GATE_1.recuperacion_citas
+python -m pytest tests/test_recuperacion_citas.py -q
+```
+
+La ejecución completa reindexa con Gemini Embeddings y hace dos búsquedas y dos
+consultas al modelo, por lo que requiere una clave válida y puede consumir
+cuota. Las pruebas usan dobles locales y no llaman a Gemini.
+Consulta [la guía del Bloque 26](docs/bloque-26-recuperacion-rag.md) para el
+flujo, la validación de citas y los problemas frecuentes.
+
+### Evaluar recuperación y registrar latencia/costo (Bloques 27-28)
+
+`src/GATE_1/evaluar_recuperacion.py` calcula precisión, recall y F1 por
+pregunta para diez casos etiquetados sobre el corpus actual. La evaluación
+consulta el índice real con embeddings de Gemini y agrega cada corrida a
+`resultados_evaluacion.jsonl`, conservando `k`, chunking y resultados
+individuales:
+
+```console
+python -m src.GATE_1.evaluar_recuperacion --k 3
+python -m pytest tests/test_evaluacion_recuperacion.py -q
+```
+
+`src/GATE_1/registro_rag.py` mide embedding+búsqueda y generación, y guarda los
+tokens reales de `usage_metadata`, que permiten estimar el costo según las
+tarifas vigentes del modelo. Cada consulta agrega una línea a
+`registros_latencia_costo.jsonl`:
+
+```console
+python -m src.GATE_1.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
+python -m src.GATE_1.registro_rag --actividad-core
+python -m pytest tests/test_registro_rag.py -q
+python -m src.GATE_1.preflight_rag
+```
+
+`--actividad-core` imprime en consola las tres consultas, la comparación de
+`input_tokens` para `k=3` y `k=6`, y el total de líneas guardadas. Ejecuta cinco
+consultas reales y puede consumir cuota.
+
+Ambos archivos de resultados quedan excluidos de Git. Las evaluaciones y el
+registro real requieren credenciales de Gemini y pueden consumir cuota; las
+pruebas enfocadas usan datos simulados sin red. Consulta las guías de
+[evaluación de recuperación](docs/bloque-27-evaluacion-recuperacion.md) y
+[latencia y costo RAG](docs/bloque-28-latencia-costo-rag.md) para etiquetas,
+interpretación de resultados, comparación de `k` y solución de problemas.
+
 ## Revisar GATE_1
 
 Desde la raíz del repositorio ejecuta el verificador:

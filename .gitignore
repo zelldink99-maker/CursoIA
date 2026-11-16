@@ -20,5 +20,7 @@ Thumbs.db
 # Logs
 *.log
 trazas_agente.jsonl
+resultados_evaluacion.jsonl
+registros_latencia_costo.jsonl
 vectorstore/
 vectorstore_ejemplo/

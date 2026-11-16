@@ -72,6 +72,41 @@ La búsqueda vectorial usa la API de Gemini para calcular el embedding de la
 consulta. Reabrir y contar el índice por sí solos no hacen esa llamada ni
 vuelven a calcular los embeddings almacenados.
 
+## Recuperación con prompt y citas
+
+Para ejecutar el flujo completo (reindexación con metadatos, búsqueda de
+fragmentos y respuesta con referencias a la fuente), usa:
+
+```console
+python -m src.GATE_1.recuperacion_citas
+```
+
+El script reindexa los cinco documentos mediante `indexar_corpus`, por lo que
+las citas recuperadas usan sus metadatos `source`. Después ejecuta dos preguntas
+de demostración. `formatear_contexto` antepone `[1]`, `[2]`, etc. a cada
+fragmento y genera un mapa de número a ruta; `construir_prompt` indica que el
+modelo responda solo con ese contexto, cite sus afirmaciones y reconozca cuando
+no haya información suficiente. La salida muestra la respuesta generada y el
+mapa de fuentes, por ejemplo `citas: {1: 'src/GATE_1/cliente.py'}`.
+El script también rechaza citas a números que no se recuperaron y respuestas
+sin referencias cuando sí había contexto.
+
+La reindexación y cada búsqueda calculan embeddings con Gemini, y las
+respuestas llaman al modelo configurado en `modeloIA`; este flujo requiere
+credenciales y puede consumir cuota. Las citas son generadas por el modelo a
+partir del prompt y deben revisarse contra el fragmento y la fuente impresos;
+no constituyen una validación automática de cada afirmación.
+
+Para probar la numeración, construcción del prompt, recuperación y dos consultas
+sin red:
+
+```console
+python -m pytest tests/test_recuperacion_citas.py -q
+```
+
+La explicación completa del flujo de recuperación y citas está en
+[docs/bloque-26-recuperacion-rag.md](./bloque-26-recuperacion-rag.md).
+
 ## Pruebas locales
 
 Desde la raíz:

@@ -2,12 +2,25 @@
 
 Los cambios importantes del proyecto se documentan en este archivo.
 
-## [No publicado] - 2026-11-11
+## [No publicado] - 2026-11-16
 
 ### Añadido
 
 - Réplica guiada del Bloque 25 con un corpus separado, colección Chroma propia,
   verificación de integridad, reintentos ante cuota 429 y guía de troubleshooting.
+- Script RAG de reindexación, recuperación y respuestas con contexto y fuentes
+  numeradas; incluye dos preguntas de demostración y pruebas con dobles locales.
+- Guía propia del Bloque 26 para recuperación semántica, contexto numerado,
+  citas, límites y pruebas sin API.
+- Evaluación de recuperación RAG con precisión, recall y F1 por pregunta,
+  etiquetas basadas en los IDs estables del corpus y registro acumulativo de
+  resultados JSONL.
+- Instrumentación de consultas RAG reales para medir embedding, búsqueda y
+  generación y conservar los tokens reales reportados por el modelo;
+  modo `--actividad-core` con comparación de `k` y resumen del archivo JSONL.
+- Preflight local sin API para detectar un índice ausente o no excluido de Git.
+- Guías de los Bloques 27 y 28 y pruebas locales para métricas, casos borde,
+  persistencia de resultados y medición sin llamadas de red.
 - Selector central `modeloIA` en `.env`, con `gemini-3.8-flash` como valor
   predeterminado y `gemini-3.5-flash` como alternativa.
 - Factory compartida para inicializar clientes LangChain con el modelo
