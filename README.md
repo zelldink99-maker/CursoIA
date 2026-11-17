@@ -515,6 +515,25 @@ pruebas enfocadas usan datos simulados sin red. Consulta las guías de
 [latencia y costo RAG](docs/bloque-28-latencia-costo-rag.md) para etiquetas,
 interpretación de resultados, comparación de `k` y solución de problemas.
 
+### Personalización y dataset de tuning (Bloque 29)
+
+El Bloque 29 compara RAG, fine-tuning completo, PEFT y soft-prompting, y
+presenta un dataset de ejemplo para aprender un formato de clasificación
+consistente. Comprueba los requisitos locales sin llamar a Gemini y ejecuta la
+validación del dataset con:
+
+```console
+python -m src.GATE_1.verificar_entorno
+python -m src.GATE_1.dataset_tuning
+python -m pytest tests/test_dataset_tuning.py -q
+```
+
+La construcción, validación y revisión de balance son locales y no generan
+costo. El envío de un trabajo de tuning es opcional, requiere acceso habilitado
+y puede generar costo; no se ejecuta en este proyecto. La guía incluye el flujo
+de trabajo, criterios de elección, ejercicio propio y errores frecuentes:
+[docs/bloque-29-personalizacion-modelos.md](docs/bloque-29-personalizacion-modelos.md).
+
 ## Revisar GATE_1
 
 Desde la raíz del repositorio ejecuta el verificador:
