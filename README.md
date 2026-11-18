@@ -534,6 +534,28 @@ y puede generar costo; no se ejecuta en este proyecto. La guía incluye el flujo
 de trabajo, criterios de elección, ejercicio propio y errores frecuentes:
 [docs/bloque-29-personalizacion-modelos.md](docs/bloque-29-personalizacion-modelos.md).
 
+### Decisión de personalización (Bloque 30)
+
+El Bloque 30 estima el costo humano del etiquetado, compara RAG, fine-tuning
+completo y PEFT con un método que informa empates, y genera el esqueleto de la
+decisión fundamentada para tu proyecto. Para mostrar en consola una decisión
+de ejemplo completa y guardarla como `decision_personalizacion.md`, ejecuta:
+
+```console
+python -m src.GATE_1.decision_personalizacion
+```
+
+El ejemplo no usa la API y el comando no sobrescribe un documento existente.
+Ejecuta las pruebas locales sin credenciales ni llamadas de red:
+
+```console
+python -m pytest tests/test_decision_personalizacion.py -q
+```
+
+La consulta de estadísticas de un trabajo de tuning existente es opcional y no
+inicia entrenamiento. La guía completa y los ejercicios están en
+[docs/bloque-30-decision-personalizacion.md](docs/bloque-30-decision-personalizacion.md).
+
 ## Revisar GATE_1
 
 Desde la raíz del repositorio ejecuta el verificador:
