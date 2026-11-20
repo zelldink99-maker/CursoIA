@@ -3,7 +3,7 @@
 La réplica usa una política ficticia de devoluciones para comprobar el flujo de
 chunking, validación local, embeddings, indexación y persistencia sobre un
 corpus distinto al del Bloque 24. Su código está en
-[`src/GATE_1/replica_corpus_ejemplo.py`](../src/GATE_1/replica_corpus_ejemplo.py);
+[`src/GATE_2/replica_corpus_ejemplo.py`](../src/GATE_2/replica_corpus_ejemplo.py);
 no modifica la colección `curso_ia_corpus` ni la carpeta `vectorstore/`.
 
 ## Requisitos
@@ -22,7 +22,7 @@ no modifica la colección `curso_ia_corpus` ni la carpeta `vectorstore/`.
 Desde la raíz, corre:
 
 ```console
-python -m src.GATE_1.replica_corpus_ejemplo
+python -m src.GATE_2.replica_corpus_ejemplo
 ```
 
 El programa divide cinco textos con `chunk_size=150` y `chunk_overlap=20`,

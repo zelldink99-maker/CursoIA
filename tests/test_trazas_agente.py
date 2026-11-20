@@ -11,7 +11,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1.trazas_agente import (
+from src.GATE_2.trazas_agente import (
     marcar_repeticiones_sospechosas,
     registrar_traza,
 )

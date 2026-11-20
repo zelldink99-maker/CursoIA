@@ -14,7 +14,7 @@ else:
 
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
-    from src.GATE_1.configuracion import modeloIA
+    from src.GATE_2.configuracion import modeloIA
 
 # Importa las funciones que preparan la petición y la que la envía a Gemini.
 from peticiones import create_headers, create_payload, make_request

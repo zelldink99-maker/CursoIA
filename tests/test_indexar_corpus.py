@@ -11,9 +11,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-import src.GATE_1.indexar_corpus as indexador
+import src.GATE_2.indexar_corpus as indexador
 
-from src.GATE_1.indexar_corpus import (
+from src.GATE_2.indexar_corpus import (
     CORPUS_DOCUMENTOS,
     TAMANO_CHUNK,
     abrir_vectorstore,
@@ -138,6 +138,79 @@ def test_reindexar_elimina_chunks_obsoletos_de_las_mismas_fuentes(
 
     assert cantidad_larga > 5
     assert len(index_corto.get()["ids"]) == 5
+
+
+def test_reindexar_elimina_fuentes_src_obsoletas_y_preserva_otros_datos(
+    tmp_path: Path,
+) -> None:
+    embeddings = EmbeddingsDeterministas()
+    ruta = tmp_path / "vectorstore"
+    corpus_antiguo = tuple(
+        Document(
+            page_content=f"Contenido obsoleto {indice}.",
+            metadata={"source": f"src/archivo_obsoleto_{indice}.py"},
+        )
+        for indice in range(5)
+    ) + (
+        Document(
+            page_content="Dato ajeno al código fuente.",
+            metadata={"source": "misc/"},
+        ),
+    )
+    indexar_corpus(
+        embeddings,
+        persist_directory=ruta,
+        documentos=corpus_antiguo,
+    )
+
+    actualizado = indexar_corpus(
+        embeddings,
+        persist_directory=ruta,
+    )
+    elementos = actualizado.get(include=["metadatas"])
+    fuentes = {metadata["source"] for metadata in elementos["metadatas"]}
+
+    assert len(elementos["ids"]) == 6
+    assert "misc/" in fuentes
+    assert all(not fuente.startswith("src/archivo_obsoleto_") for fuente in fuentes)
+
+
+def test_validar_migra_rutas_legacy_reutilizando_el_indice_persistido(
+    tmp_path: Path,
+) -> None:
+    embeddings = EmbeddingsDeterministas()
+    ruta = tmp_path / "vectorstore"
+    corpus_antiguo = tuple(
+        Document(
+            page_content=documento.page_content,
+            metadata={
+                **documento.metadata,
+                "source": str(documento.metadata["source"]).replace(
+                    "src/GATE_2/",
+                    "src/legacy/",
+                ),
+            },
+        )
+        for documento in CORPUS_DOCUMENTOS
+    )
+    vectorstore = indexar_corpus(
+        embeddings,
+        persist_directory=ruta,
+        documentos=corpus_antiguo,
+    )
+
+    indexador.validar_fuentes_actuales(vectorstore)
+    migrado = vectorstore.get(include=["metadatas"])
+    fuentes = {metadata["source"] for metadata in migrado["metadatas"]}
+
+    assert set(migrado["ids"]) == set(
+        indexador._ids_para_chunks(dividir_corpus())
+    )
+    assert all(not fuente.startswith("src/legacy/") for fuente in fuentes)
+    assert all(
+        fuente in {documento.metadata["source"] for documento in CORPUS_DOCUMENTOS}
+        for fuente in fuentes
+    )
 
 
 def test_no_se_acepta_documento_sin_fuente() -> None:

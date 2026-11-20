@@ -4,7 +4,7 @@ Este bloque convierte la comparación de RAG, fine-tuning completo y PEFT en
 una decisión repetible para un proyecto real. Primero estima los costos de
 etiquetado, infraestructura y tiempo; después puntúa cinco criterios y redacta
 una decisión con evidencia. La implementación local está en
-[`src/GATE_1/decision_personalizacion.py`](../src/GATE_1/decision_personalizacion.py).
+[`src/GATE_2/decision_personalizacion.py`](../src/GATE_2/decision_personalizacion.py).
 
 ## Requisitos
 
@@ -28,7 +28,7 @@ existentes sin etiquetarlos.
 Calcula el costo humano antes de comprometerte con el tamaño del dataset:
 
 ```python
-from src.GATE_1.decision_personalizacion import estimar_costo_de_etiquetar
+from src.GATE_2.decision_personalizacion import estimar_costo_de_etiquetar
 
 horas, costo = estimar_costo_de_etiquetar(8, 5, 25)
 print(f"{horas:.2f} horas, aprox ${costo:.2f}")
@@ -52,7 +52,7 @@ Cada uno de 500 ejemplos toma 4 minutos a $20 por hora. El 20 % requiere una
 segunda revisión de 2 minutos:
 
 ```python
-from src.GATE_1.decision_personalizacion import estimar_costo_de_etiquetar
+from src.GATE_2.decision_personalizacion import estimar_costo_de_etiquetar
 
 horas_base, costo_base = estimar_costo_de_etiquetar(500, 4, 20)
 horas_rev, costo_rev = estimar_costo_de_etiquetar(500 * 0.20, 2, 20)
@@ -81,7 +81,7 @@ estadísticas exactas del dataset:
 ```python
 from dotenv import load_dotenv
 from google import genai
-from src.GATE_1.decision_personalizacion import obtener_estadisticas_tuning
+from src.GATE_2.decision_personalizacion import obtener_estadisticas_tuning
 
 load_dotenv()
 client = genai.Client()
@@ -139,7 +139,7 @@ como `"si"`. La función detecta claves faltantes y devuelve todas las técnicas
 empatadas. Este caso muestra el empate entre fine-tuning completo y PEFT:
 
 ```python
-from src.GATE_1.decision_personalizacion import recomendar_estrategia
+from src.GATE_2.decision_personalizacion import recomendar_estrategia
 
 respuestas_caso2 = {
     "informacion_cambia_seguido": False,
@@ -196,21 +196,23 @@ Anota el hecho o número que sustenta cada respuesta. Para ver en consola una
 corrida completa y crear un documento de ejemplo, ejecuta desde la raíz:
 
 ```console
-python -m src.GATE_1.decision_personalizacion
+python -m src.GATE_2.decision_personalizacion
 ```
 
 El programa imprime los puntajes y las cuatro secciones completas, y guarda
-`decision_personalizacion.md` en la carpeta actual. Es una demostración con el
+`docs/decision_personalizacion.md` por defecto. Es una demostración con el
 caso de ejemplo de abajo, no una decisión automática sobre tu proyecto. El
 programa se niega a sobrescribir un archivo existente. Para preparar tu propia
 actividad, edita `respuestas_ejemplo`, el problema y los textos de justificación
 y requisitos en `main()`; basa las respuestas en la evidencia de tu proyecto.
+El ejemplo completo ya documentado también está disponible en
+[`docs/decision_personalizacion.md`](decision_personalizacion.md).
 La función generadora también permite producir un esqueleto con marcadores:
 
 ```python
 from pathlib import Path
 
-from src.GATE_1.decision_personalizacion import (
+from src.GATE_2.decision_personalizacion import (
     generar_esqueleto_decision,
     recomendar_estrategia,
 )
@@ -226,7 +228,7 @@ problema = "Describe en una o dos oraciones la carencia del sistema."
 
 puntos, ganadoras = recomendar_estrategia(respuestas_mi_caso)
 esqueleto = generar_esqueleto_decision(problema, puntos, ganadoras)
-Path("decision_personalizacion.md").write_text(esqueleto, encoding="utf-8")
+Path("docs/decision_personalizacion.md").write_text(esqueleto, encoding="utf-8")
 print(esqueleto)
 ```
 

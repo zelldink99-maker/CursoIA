@@ -22,7 +22,7 @@ incluyas en Git.
 Comprueba el entorno sin llamar a la API:
 
 ```console
-python -m src.GATE_1.verificar_entorno
+python -m src.GATE_2.verificar_entorno
 ```
 
 El verificador confirma Python, el paquete, los tipos de tuning disponibles y
@@ -91,7 +91,7 @@ y promoción.
 Desde la raíz, ejecuta:
 
 ```console
-python -m src.GATE_1.dataset_tuning
+python -m src.GATE_2.dataset_tuning
 ```
 
 El script construye doce `types.TuningExample` y muestra los mismos tres pasos
@@ -109,7 +109,7 @@ python -m pytest tests/test_dataset_tuning.py -q
 La construcción usa los tipos reales del SDK:
 
 ```python
-from src.GATE_1.dataset_tuning import EJEMPLOS_RAW, construir_ejemplos
+from src.GATE_2.dataset_tuning import EJEMPLOS_RAW, construir_ejemplos
 
 examples = construir_ejemplos(EJEMPLOS_RAW)
 ```
@@ -220,7 +220,7 @@ de usar el modelo resultante.
 - **`ModuleNotFoundError` al importar `google.genai`:** activa el entorno
   virtual e instala dependencias con `python -m pip install -r requirements.txt`.
 - **No aparecen `TuningMode` o `AdapterSize`:** actualiza `google-genai` y vuelve
-  a ejecutar `python -m src.GATE_1.verificar_entorno`.
+  a ejecutar `python -m src.GATE_2.verificar_entorno`.
 - **Salida marcada como JSON inválido:** JSON exige comillas dobles; una cadena
   con comillas simples puede ser un literal de Python, pero no JSON.
 - **Campo desconocido o `ValidationError`:** consulta

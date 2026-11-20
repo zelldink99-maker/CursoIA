@@ -10,8 +10,8 @@ else:
     project_root = Path(__file__).resolve().parents[2]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    from src.GATE_1.cliente import consultar_modelo
-    from src.GATE_1.pipeline_texto import procesar_texto
+    from src.GATE_2.cliente import consultar_modelo
+    from src.GATE_2.pipeline_texto import procesar_texto
 
 def main() -> int:
     """Consulta el modelo e imprime la coincidencia cruda y procesada."""

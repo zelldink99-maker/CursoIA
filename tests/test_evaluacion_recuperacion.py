@@ -13,14 +13,14 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1 import evaluar_recuperacion
-from src.GATE_1.indexar_corpus import dividir_corpus
+from src.GATE_2 import evaluar_recuperacion
+from src.GATE_2.indexar_corpus import dividir_corpus
 
 
 def test_evaluador_se_ejecuta_como_script_fuera_de_la_raiz(
     tmp_path: Path,
 ) -> None:
-    script = ROOT_DIR / "src" / "GATE_1" / "evaluar_recuperacion.py"
+    script = ROOT_DIR / "src" / "GATE_2" / "evaluar_recuperacion.py"
     resultado = subprocess.run(
         [sys.executable, str(script), "--help"],
         cwd=tmp_path,

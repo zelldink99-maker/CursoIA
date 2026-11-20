@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from langchain_core.runnables import RunnableLambda  # noqa: E402
 
-from src.GATE_1.enrutamiento import construir_cadena_queja_segura  # noqa: E402
+from src.GATE_2.enrutamiento import construir_cadena_queja_segura  # noqa: E402
 
 
 def _simular_fallo_de_red(_: dict[str, str]) -> None:

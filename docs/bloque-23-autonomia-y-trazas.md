@@ -34,7 +34,7 @@ Windows necesita otro mecanismo, y la espera debe tener un timeout explícito.
 
 ## Registro de decisiones observables
 
-`src/GATE_1/trazas_agente.py` guarda cada interacción en
+`src/GATE_2/trazas_agente.py` guarda cada interacción en
 `trazas_agente.jsonl`, una línea JSON por llamada. El registro contiene
 timestamp UTC, sesión, entrada, herramientas, argumentos, observaciones y
 respuesta final. Si el ejecutor no devuelve `intermediate_steps`, registra
@@ -55,13 +55,13 @@ Ejecuta el agente desde la raíz para generar trazas (requiere `GEMINI_API_KEY`
 y puede generar costos):
 
 ```console
-python -m src.GATE_1.agente_con_herramientas
+python -m src.GATE_2.agente_con_herramientas
 ```
 
 Revisa repeticiones desde la raíz:
 
 ```console
-python -c "from src.GATE_1.trazas_agente import marcar_repeticiones_sospechosas; marcar_repeticiones_sospechosas()"
+python -c "from src.GATE_2.trazas_agente import marcar_repeticiones_sospechosas; marcar_repeticiones_sospechosas()"
 ```
 
 Las pruebas del registrador y el analizador no usan Gemini:

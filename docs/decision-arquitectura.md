@@ -2,11 +2,11 @@
 
 ## Modelo elegido
 
-El flujo principal de producción es `src/GATE_1/cliente.py`, que usa
-`src/GATE_1/monolitico.py` como transporte y consulta el modelo seleccionado en
+El flujo principal de producción es `src/GATE_2/cliente.py`, que usa
+`src/GATE_2/monolitico.py` como transporte y consulta el modelo seleccionado en
 `modeloIA`, definido en `.env`. El valor predeterminado es **Gemini 3.8 Flash**
 (`gemini-3.8-flash`); también se admite `gemini-3.5-flash`. La variable se
-carga y valida en `src/GATE_1/configuracion.py`, compartida por los clientes
+carga y valida en `src/GATE_2/configuracion.py`, compartida por los clientes
 HTTP y LangChain. El transporte acepta una instrucción del sistema en cada
 solicitud. `consumir_gemini.py` mantiene la interfaz anterior, pero delega
 todas las consultas en este cliente principal.
@@ -22,7 +22,7 @@ actualiza los precios antes de interpretar el costo como estimación de ese
 modelo. No se incluyen comparaciones de latencia o calidad porque el repositorio
 no conserva mediciones reproducibles para otros modelos.
 
-El módulo `src/GATE_1/cliente.py` compone `monolitico.py` con
+El módulo `src/GATE_2/cliente.py` compone `monolitico.py` con
 `cliente_reintento.py`: clasifica 401/403 como errores no reintentables y 429,
 5xx, timeout y conexión como fallos transitorios. Los reintentos usan backoff
 exponencial con jitter y un máximo configurable de 30 segundos por espera. El
@@ -41,8 +41,8 @@ la raíz para comprobar clasificación HTTP, reintentos, costos y la interfaz
 pública. El archivo también agrega la raíz del proyecto a `sys.path` y ejecuta
 pytest si se inicia directamente con `python tests/test_cliente.py`.
 
-El punto de entrada principal `python -m src.GATE_1.cliente` realiza una sola
-consulta y muestra el texto y su costo acumulado. `src/GATE_1/main.py` se
+El punto de entrada principal `python -m src.GATE_2.cliente` realiza una sola
+consulta y muestra el texto y su costo acumulado. `src/GATE_2/main.py` se
 conserva como lanzador compatible del mismo flujo. La función independiente
 `ejecutar_ensayo()` es una herramienta de evaluación, no de producción: realiza
 diez consultas y muestra por cada respuesta exitosa el texto resumido, el total
@@ -54,7 +54,7 @@ los errores permanentes detienen el ensayo.
 Desde la raíz, el ensayo se puede iniciar sin modificar el bloque `__main__`:
 
 ```console
-python -c "from src.GATE_1.cliente import ejecutar_ensayo; raise SystemExit(ejecutar_ensayo())"
+python -c "from src.GATE_2.cliente import ejecutar_ensayo; raise SystemExit(ejecutar_ensayo())"
 ```
 
 ## Diagrama de arquitectura
@@ -71,9 +71,9 @@ El flujo de producción de consulta es:
    el cliente valida los metadatos de uso y registra el costo antes de devolver
    la respuesta.
 
-Este flujo corresponde a `src/GATE_1/cliente.py`, que utiliza
-`src/GATE_1/monolitico.py` para las solicitudes HTTP y la validación de Gemini.
-`src/GATE_1/main.py` y `src/GATE_1/consumir_gemini.py` conservan interfaces
+Este flujo corresponde a `src/GATE_2/cliente.py`, que utiliza
+`src/GATE_2/monolitico.py` para las solicitudes HTTP y la validación de Gemini.
+`src/GATE_2/main.py` y `src/GATE_2/consumir_gemini.py` conservan interfaces
 compatibles que delegan en el mismo cliente, sin duplicar la lógica de consulta.
 
 El cliente principal y su lanzador compatible capturan los errores esperables y
@@ -81,16 +81,16 @@ devuelven un código de salida distinto de cero. `latencia.py` y
 `prompts/banco.py` son herramientas de evaluación; `api_test.py` y
 `module_test.py` son comprobaciones del transporte. El cálculo de costos, la
 configuración de latencia y la división también rechazan entradas inválidas
-explícitamente. El verificador `revision_gate_1.py --omitir-api` cubre estos
+explícitamente. El verificador `revision_gate_2.py --omitir-api` cubre estos
 rechazos localmente sin realizar solicitudes a Gemini.
 
 ## Medición de latencia y estimación de costo
 
-La clase `Latencia`, en `src/GATE_1/latencia.py`, realiza cuatro solicitudes de prueba por defecto usando el modelo definido por `modeloIA` mediante las funciones de `src/GATE_1/monolitico.py`. Imprime el tiempo de cada solicitud, el promedio y estima el costo de la última respuesta con `calcular_costo`, de `src/GATE_1/costo.py`. La prueba se ejecuta al lanzar el módulo o llamar `Latencia.ejecutar()`; importarlo no realiza solicitudes.
+La clase `Latencia`, en `src/GATE_2/latencia.py`, realiza cuatro solicitudes de prueba por defecto usando el modelo definido por `modeloIA` mediante las funciones de `src/GATE_2/monolitico.py`. Imprime el tiempo de cada solicitud, el promedio y estima el costo de la última respuesta con `calcular_costo`, de `src/GATE_2/costo.py`. La prueba se ejecuta al lanzar el módulo o llamar `Latencia.ejecutar()`; importarlo no realiza solicitudes.
 
 `enviar_peticion` conserva el JSON completo de Gemini, incluidos los metadatos
 `usageMetadata` cuando están presentes. La función auxiliar de diagnóstico en
-`src/GATE_1/monolitico.py` puede extraer y mostrar los tokens de entrada
+`src/GATE_2/monolitico.py` puede extraer y mostrar los tokens de entrada
 (`promptTokenCount`), de salida (`candidatesTokenCount`) y el total
 (`totalTokenCount`). Si faltan o tienen un formato inválido, el cliente lo
 comunica como `GeminiResponseError`. El módulo `costo.py` usa los contadores de
@@ -167,13 +167,13 @@ El proyecto no cambia de modelo automáticamente. El cliente modular
 `cliente.py` reintenta errores transitorios; las herramientas de evaluación
 `latencia.py` y `prompts/banco.py` usan el mismo transporte sin reintentos.
 Para cambiar el modelo del flujo principal y de estas herramientas, edita la
-variable `modelo` de `src/GATE_1/monolitico.py` y usa un identificador que
+variable `modelo` de `src/GATE_2/monolitico.py` y usa un identificador que
 aparezca habilitado para tu cuenta. Por ejemplo, podrías probar
 `gemini-3.6-flash` como alternativa a `gemini-3.8-flash` **si la API la ofrece
-para tu proyecto**. La interfaz compatible `src/GATE_1/consumir_gemini.py`
+para tu proyecto**. La interfaz compatible `src/GATE_2/consumir_gemini.py`
 utiliza ese mismo cliente y no mantiene una configuración de modelo separada.
 
-Después del cambio, ejecuta `python src\GATE_1\revision_gate_1.py --omitir-api`
+Después del cambio, ejecuta `python src\GATE_2\revision_gate_2.py --omitir-api`
 para validar localmente el formato y luego realiza una petición
 de prueba con una pregunta pequeña. Confirma que el identificador del modelo,
 el esquema JSON requerido, los límites de tokens, la cuota y el precio estén
@@ -182,7 +182,7 @@ disponibilidad y los límites pueden variar por proyecto, región y fecha.
 
 ## Flujo de enrutamiento de soporte
 
-El ejemplo educativo `src/GATE_1/enrutamiento.py` clasifica mensajes y los
+El ejemplo educativo `src/GATE_2/enrutamiento.py` clasifica mensajes y los
 dirige a respuestas de queja, sugerencia o pregunta. Cada ruta usa
 `with_fallbacks` para devolver una respuesta útil si falla; la función
 `procesar_mensaje_seguro` registra con `logger.exception` y devuelve un mensaje

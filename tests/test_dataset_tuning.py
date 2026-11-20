@@ -9,7 +9,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1.dataset_tuning import (
+from src.GATE_2.dataset_tuning import (
     EJEMPLOS_RAW,
     chequear_balance,
     construir_ejemplos,
@@ -54,7 +54,7 @@ def test_validador_detecta_salida_json_que_no_es_objeto() -> None:
 
 
 def test_main_imprime_los_tres_pasos_y_demuestra_el_error(capsys) -> None:
-    from src.GATE_1.dataset_tuning import main
+    from src.GATE_2.dataset_tuning import main
 
     assert main() == 0
     salida = capsys.readouterr().out

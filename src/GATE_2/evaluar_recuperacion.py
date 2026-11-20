@@ -20,16 +20,18 @@ if __package__:
         TAMANO_CHUNK,
         abrir_vectorstore,
         crear_embeddings,
+        validar_fuentes_actuales,
     )
 else:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
-    from src.GATE_1.indexar_corpus import (
+    from src.GATE_2.indexar_corpus import (
         RUTA_VECTORSTORE,
         SOLAPAMIENTO_CHUNK,
         TAMANO_CHUNK,
         abrir_vectorstore,
         crear_embeddings,
+        validar_fuentes_actuales,
     )
 
 RUTA_RESULTADOS = PROJECT_ROOT / "resultados_evaluacion.jsonl"
@@ -54,35 +56,35 @@ class Retriever(Protocol):
 CASOS_EVALUACION: tuple[CasoEvaluacion, ...] = (
     {
         "pregunta": "¿Cuántas veces reintenta el cliente los errores transitorios?",
-        "ids_relevantes": {"src/GATE_1/cliente.py::chunk-0"},
+        "ids_relevantes": {"src/GATE_2/cliente.py::chunk-0"},
     },
     {
         "pregunta": "¿Qué errores no vuelve a intentar el cliente?",
-        "ids_relevantes": {"src/GATE_1/cliente.py::chunk-0"},
+        "ids_relevantes": {"src/GATE_2/cliente.py::chunk-0"},
     },
     {
         "pregunta": "¿Cómo se calcula el costo de entrada de Gemini?",
-        "ids_relevantes": {"src/GATE_1/costo.py::chunk-0"},
+        "ids_relevantes": {"src/GATE_2/costo.py::chunk-0"},
     },
     {
         "pregunta": "¿Qué tokens se cobran como salida en el cálculo de costos?",
-        "ids_relevantes": {"src/GATE_1/costo.py::chunk-0"},
+        "ids_relevantes": {"src/GATE_2/costo.py::chunk-0"},
     },
     {
         "pregunta": "¿Cómo se separa la memoria de conversación del agente?",
-        "ids_relevantes": {"src/GATE_1/agente_con_herramientas.py::chunk-0"},
+        "ids_relevantes": {"src/GATE_2/agente_con_herramientas.py::chunk-0"},
     },
     {
         "pregunta": "¿Qué hace el agente de soporte con las herramientas?",
-        "ids_relevantes": {"src/GATE_1/agente_con_herramientas.py::chunk-0"},
+        "ids_relevantes": {"src/GATE_2/agente_con_herramientas.py::chunk-0"},
     },
     {
         "pregunta": "¿Qué información se guarda en las trazas JSONL?",
-        "ids_relevantes": {"src/GATE_1/trazas_agente.py::chunk-0"},
+        "ids_relevantes": {"src/GATE_2/trazas_agente.py::chunk-0"},
     },
     {
         "pregunta": "¿Qué marca el analizador de trazas para revisión?",
-        "ids_relevantes": {"src/GATE_1/trazas_agente.py::chunk-0"},
+        "ids_relevantes": {"src/GATE_2/trazas_agente.py::chunk-0"},
     },
     {
         "pregunta": "¿Las pruebas automatizadas necesitan llamadas a Gemini?",
@@ -212,8 +214,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not vectorstore.get(limit=1)["ids"]:
         raise ValueError(
             f"No hay chunks indexados en {RUTA_VECTORSTORE}. "
-            "Ejecuta primero src.GATE_1.indexar_corpus."
+            "Ejecuta primero src.GATE_2.indexar_corpus."
         )
+    validar_fuentes_actuales(vectorstore)
     retriever = vectorstore.as_retriever(search_kwargs={"k": argumentos.k})
     (
         resultados,

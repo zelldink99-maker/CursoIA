@@ -15,7 +15,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1.agente_con_herramientas import (  # noqa: E402
+from src.GATE_2.agente_con_herramientas import (  # noqa: E402
     buscar_en_documentacion,
     calcular_costo_tokens,
     cerrar_sesion,
@@ -23,7 +23,7 @@ from src.GATE_1.agente_con_herramientas import (  # noqa: E402
     construir_agente_con_memoria,
     obtener_historial,
 )
-from src.GATE_1.costo import (  # noqa: E402
+from src.GATE_2.costo import (  # noqa: E402
     PRECIO_ENTRADA_POR_TOKEN,
     PRECIO_SALIDA_POR_TOKEN,
 )

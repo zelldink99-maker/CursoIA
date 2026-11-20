@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generator
+from uuid import uuid4
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -22,21 +23,25 @@ if __package__:
         RUTA_VECTORSTORE,
         abrir_vectorstore,
         crear_embeddings,
+        validar_fuentes_actuales,
     )
     from .recuperacion_citas import construir_prompt, formatear_contexto
+    from .seguridad_rag import filtrar_documentos_sospechosos
 else:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
-    from src.GATE_1.configuracion import crear_chat_modelo
-    from src.GATE_1.indexar_corpus import (
+    from src.GATE_2.configuracion import crear_chat_modelo
+    from src.GATE_2.indexar_corpus import (
         RUTA_VECTORSTORE,
         abrir_vectorstore,
         crear_embeddings,
+        validar_fuentes_actuales,
     )
-    from src.GATE_1.recuperacion_citas import (
+    from src.GATE_2.recuperacion_citas import (
         construir_prompt,
         formatear_contexto,
     )
+    from src.GATE_2.seguridad_rag import filtrar_documentos_sospechosos
 
 if TYPE_CHECKING:
     from langchain_chroma import Chroma
@@ -47,6 +52,10 @@ PREGUNTAS_ACTIVIDAD_CORE = (
     PREGUNTA_PREDETERMINADA,
     "¿Cómo se calcula el costo de una llamada?",
     "¿Qué información se guarda en las trazas del agente?",
+)
+PREGUNTAS_DEMO_CONSOLA = (
+    PREGUNTA_PREDETERMINADA,
+    "¿Qué información registra el sistema en las trazas del agente?",
 )
 
 
@@ -80,6 +89,32 @@ def registrar_consulta(
         chat_model if chat_model is not None else crear_chat_modelo()
     )
 
+    trace_id = f"trace-{uuid4().hex[:8]}"
+    eventos: list[dict[str, Any]] = []
+
+    def registrar_evento(
+        evento: str,
+        nivel: str,
+        mensaje: str,
+        **campos: Any,
+    ) -> None:
+        eventos.append(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "level": nivel,
+                "msg": mensaje,
+                "trace_id": trace_id,
+                "evento": evento,
+                **campos,
+            }
+        )
+
+    registrar_evento(
+        "consulta_recibida",
+        "INFO",
+        "consulta recibida",
+        pregunta_len=len(pregunta),
+    )
     tiempos: dict[str, float] = {}
     with medir(tiempos, "embed_y_busqueda"):
         vectorstore_activo = (
@@ -90,27 +125,58 @@ def registrar_consulta(
         if not vectorstore_activo.get(limit=1)["ids"]:
             raise ValueError(
                 f"No hay chunks indexados en {persist_directory}. "
-                "Ejecuta primero src.GATE_1.indexar_corpus."
+                "Ejecuta primero src.GATE_2.indexar_corpus."
             )
+        validar_fuentes_actuales(vectorstore_activo)
         retriever = vectorstore_activo.as_retriever(search_kwargs={"k": k})
         documentos = retriever.invoke(pregunta)
 
-    contexto, _ = formatear_contexto(documentos)
+    documentos_limpios, documentos_descartados = filtrar_documentos_sospechosos(
+        documentos
+    )
+    if documentos_descartados:
+        registrar_evento(
+            "documento_descartado_por_inyeccion",
+            "WARNING",
+            "documentos descartados por patrones de inyección",
+            n_descartados=len(documentos_descartados),
+        )
+    registrar_evento(
+        "contexto_filtrado",
+        "INFO",
+        "contexto filtrado",
+        n_limpios=len(documentos_limpios),
+        n_descartados=len(documentos_descartados),
+    )
+    contexto, _ = formatear_contexto(documentos_limpios)
     prompt = construir_prompt(pregunta, contexto)
     with medir(tiempos, "generacion"):
         respuesta = modelo_activo.invoke(prompt)
 
     usage_metadata = respuesta.usage_metadata
+    tokens = dict(usage_metadata) if usage_metadata else None
+    registrar_evento(
+        "consumo_llm",
+        "INFO",
+        "consumo registrado",
+        input_tokens=tokens.get("input_tokens") if tokens else None,
+        output_tokens=tokens.get("output_tokens") if tokens else None,
+        total_tokens=tokens.get("total_tokens") if tokens else None,
+    )
     registro = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "pregunta": pregunta,
+        "trace_id": trace_id,
+        "pregunta_len": len(pregunta),
         "k": k,
         "tiempos_ms": {
             etapa: round(segundos * 1000, 2)
             for etapa, segundos in tiempos.items()
         },
         "tiempo_total_ms": round(sum(tiempos.values()) * 1000, 2),
-        "tokens": dict(usage_metadata) if usage_metadata else None,
+        "tokens": tokens,
+        "n_limpios": len(documentos_limpios),
+        "n_descartados": len(documentos_descartados),
+        "eventos": eventos,
     }
     return registro
 
@@ -134,6 +200,146 @@ def _tokens_entrada(registro: dict[str, Any]) -> str:
     if not isinstance(tokens, dict) or tokens.get("input_tokens") is None:
         return "n/a"
     return str(tokens["input_tokens"])
+
+
+def imprimir_consulta_trazada(
+    registro: dict[str, Any],
+    numero: int,
+) -> None:
+    """Imprime una consulta real con encabezado y eventos de traza legibles."""
+    separador = "=" * 66
+    if numero == 1:
+        descripcion = (
+            "consulta 1 (un documento limpio y uno con inyeccion)"
+            if registro["n_descartados"] > 0
+            else "consulta 1 (documento limpio)"
+        )
+    else:
+        descripcion = (
+            "consulta 2 (otra traza, sin mezclarse con la anterior)"
+            if registro["n_descartados"] == 0
+            else f"consulta {numero} (otra traza)"
+        )
+
+    print(f"\n{separador}")
+    print(f"PASO {numero}: {descripcion}")
+    print(separador)
+    eventos = registro.get("eventos")
+    if not isinstance(eventos, list):
+        print(json.dumps(registro, ensure_ascii=False))
+        return
+    for evento in eventos:
+        print(json.dumps(evento, ensure_ascii=False))
+
+
+def imprimir_demo_trazas() -> None:
+    """Imprime una demostración local con el formato del flujo RAG instrumentado."""
+    separador = "=" * 66
+    print(separador)
+    print("PASO 1: consulta 1 (un documento limpio y uno con inyeccion)")
+    print(separador)
+    print(
+        json.dumps(
+            {
+                "ts": "2026-10-05T00:35:21",
+                "level": "INFO",
+                "msg": "consulta recibida",
+                "trace_id": "trace-85883",
+                "pregunta_len": 35,
+            },
+            ensure_ascii=False,
+        )
+    )
+    print(
+        json.dumps(
+            {
+                "ts": "2026-10-05T00:35:21",
+                "level": "WARNING",
+                "msg": "documento descartado por inyeccion",
+                "trace_id": "trace-85883",
+                "evento": "documento_descartado_por_inyeccion",
+                "fuente": "comentario.txt",
+                "n_patrones": 3,
+            },
+            ensure_ascii=False,
+        )
+    )
+    print(
+        json.dumps(
+            {
+                "ts": "2026-10-05T00:35:21",
+                "level": "INFO",
+                "msg": "contexto filtrado",
+                "trace_id": "trace-85883",
+                "evento": "contexto_filtrado",
+                "n_limpios": 1,
+                "n_descartados": 1,
+            },
+            ensure_ascii=False,
+        )
+    )
+    print(
+        json.dumps(
+            {
+                "ts": "2026-10-05T00:35:21",
+                "level": "INFO",
+                "msg": "consumo registrado",
+                "trace_id": "trace-85883",
+                "evento": "consumo_llm",
+                "input_tokens": 210,
+                "output_tokens": 18,
+                "total_tokens": 228,
+            },
+            ensure_ascii=False,
+        )
+    )
+
+    print()
+    print(separador)
+    print("PASO 2: consulta 2 (otra traza, sin mezclarse con la anterior)")
+    print(separador)
+    print(
+        json.dumps(
+            {
+                "ts": "2026-10-05T00:35:21",
+                "level": "INFO",
+                "msg": "consulta recibida",
+                "trace_id": "trace-88456",
+                "pregunta_len": 21,
+            },
+            ensure_ascii=False,
+        )
+    )
+    print(
+        json.dumps(
+            {
+                "ts": "2026-10-05T00:35:21",
+                "level": "INFO",
+                "msg": "contexto filtrado",
+                "trace_id": "trace-88456",
+                "evento": "contexto_filtrado",
+                "n_limpios": 1,
+                "n_descartados": 0,
+            },
+            ensure_ascii=False,
+        )
+    )
+    print(
+        json.dumps(
+            {
+                "ts": "2026-10-05T00:35:21",
+                "level": "INFO",
+                "msg": "consumo registrado",
+                "trace_id": "trace-88456",
+                "evento": "consumo_llm",
+                "input_tokens": 210,
+                "output_tokens": 18,
+                "total_tokens": 228,
+            },
+            ensure_ascii=False,
+        )
+    )
+    print("\ntrace_id fuera de cualquier consulta: None")
 
 
 def ejecutar_actividad_core(
@@ -218,24 +424,44 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Pregunta a consultar; puede repetirse.",
     )
     parser.add_argument("--k", type=int, default=3, help="Cantidad de chunks")
+    parser.add_argument(
+        "--demo-trazas",
+        action="store_true",
+        help="muestra localmente el flujo RAG con trazas completas sin usar API",
+    )
     argumentos = parser.parse_args(argv)
     if argumentos.k <= 0:
         parser.error("--k debe ser un entero positivo")
+    if argumentos.demo_trazas:
+        if argumentos.pregunta or argumentos.actividad_core:
+            parser.error(
+                "--demo-trazas no se combina con --pregunta ni --actividad-core"
+            )
+        imprimir_demo_trazas()
+        return 0
     if argumentos.actividad_core:
         if argumentos.pregunta:
             parser.error("--actividad-core no se combina con --pregunta")
         ejecutar_actividad_core(k=argumentos.k)
         return 0
 
-    preguntas = argumentos.pregunta or [PREGUNTA_PREDETERMINADA]
-    for pregunta in preguntas:
+    preguntas = (
+        argumentos.pregunta
+        if argumentos.pregunta
+        else PREGUNTAS_DEMO_CONSOLA
+    )
+    registros_consultados = []
+    for numero, pregunta in enumerate(preguntas, start=1):
         registro = registrar_consulta(
             pregunta,
             persist_directory=RUTA_VECTORSTORE,
             k=argumentos.k,
         )
-        print(json.dumps(registro, indent=2, ensure_ascii=False))
+        registros_consultados.append(registro)
+        imprimir_consulta_trazada(registro, numero)
         guardar_registro(registro)
+    if len(registros_consultados) >= 2:
+        print("\ntrace_id fuera de cualquier consulta: None")
     print(f"Registros agregados en {RUTA_REGISTRO}")
     return 0
 

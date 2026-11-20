@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1.cadena_tres_pasos import construir_cadena
+from src.GATE_2.cadena_tres_pasos import construir_cadena
 
 
 def test_cadena_conecta_tres_pasos_y_devuelve_texto_plano() -> None:

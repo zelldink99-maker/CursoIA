@@ -11,7 +11,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1.decision_personalizacion import (
+from src.GATE_2 import decision_personalizacion
+from src.GATE_2.decision_personalizacion import (
     CLAVES_RESPUESTAS,
     estimar_costo_de_etiquetar,
     generar_esqueleto_decision,
@@ -102,6 +103,19 @@ def test_main_no_sobrescribe_un_documento_existente(tmp_path, capsys) -> None:
         f"Error: {destino} ya existe; no se sobrescribió.\n"
     )
     assert destino.read_text(encoding="utf-8") == "decisión propia"
+
+
+def test_main_guarda_por_defecto_en_docs(tmp_path, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        decision_personalizacion,
+        "RUTA_DECISION_DOCUMENTADA",
+        tmp_path / "docs" / "decision_personalizacion.md",
+    )
+
+    assert main() == 0
+    destino = tmp_path / "docs" / "decision_personalizacion.md"
+    assert destino.is_file()
+    assert "PASO 2:" in capsys.readouterr().out
 
 
 def test_consulta_estadisticas_informa_datos_ausentes_sin_fallar_silenciosamente() -> (

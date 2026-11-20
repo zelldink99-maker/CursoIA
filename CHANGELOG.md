@@ -2,6 +2,81 @@
 
 Los cambios importantes del proyecto se documentan en este archivo.
 
+## [No publicado] - 2026-11-19
+
+### Añadido
+
+- Bloque 32 consolidado en un único script para versionado y diff de prompts,
+  supervisión humana con LangGraph y matriz de al menos cinco riesgos.
+- Se agregó `src/GATE_2/unidad_completa_supervision.py`, que reproduce en consola los tres
+  pasos: versiones y diff, interrupción/aprobación y matriz ordenada por puntaje.
+- Se agregó `--demo-trazas` al módulo RAG para reproducir localmente, sin API,
+  el flujo de dos consultas, el descarte por inyección y la separación de
+  `trace_id` mostrada en las demostraciones del Bloque 31.
+- El ejemplo generado de decisión de personalización se movió a
+  `docs/decision_personalizacion.md`; el módulo escribe ese destino por defecto
+  y conserva rutas explícitas como opción.
+- Se agregó el documento generado a la sección de documentación adicional del
+  README y se excluyó también su ruta dentro de `docs/`.
+- Dependencia `langgraph>=1.2.11,<2` para ejecutar el punto de interrupción
+  y reanudar aprobaciones o rechazos con booleanos.
+- Bloque 31 con callbacks correlacionados para retriever y LLM, mitigación
+  heurística de inyección en documentos RAG, trazas por consulta sin texto
+  sensible, versionado de prompts con aprobación humana y matriz de riesgos.
+- Se agregó `src/GATE_2/privacidad_logs.py` para redactar correos y teléfonos
+  antes de persistir entradas, herramientas, observaciones y respuestas.
+- Se excluyeron cachés, secretos, trazas, resultados locales, decisiones
+  generadas y versiones de prompts en `.gitignore`; los resultados ya
+  versionados se dejaron sin seguimiento para no subirlos nuevamente.
+- Se agregaron módulos para filtros RAG, callbacks correlacionados y supervisión
+  de riesgos bajo `src/GATE_2`.
+- Pruebas locales para el filtro de documentos, roles del prompt, callbacks,
+  persistencia de versiones, interrupción humana y puntajes de riesgo.
+- Se agregó `tests/test_bloque32.py` para verificar la salida consolidada.
+
+### Cambiado
+
+- Renombrado el paquete del proyecto a `src/GATE_2`; se actualizaron imports,
+  comandos, pruebas y documentación, incluido `revision_gate_2.py`.
+- La normalización del paquete y sus rutas quedó aplicada de forma consistente
+  en código, comandos, pruebas y documentación mantenida.
+- Los registros RAG nuevos correlacionan eventos por `trace_id` y guardan la
+  longitud de la pregunta, no la pregunta, el prompt ni el contexto recuperado.
+- Las trazas del agente redactan correos y teléfonos detectables antes de
+  persistir entradas, argumentos de herramientas, observaciones y respuestas.
+- Los prompts RAG separan `SystemMessage` y `HumanMessage`, delimitan y escapan
+  el contexto como dato no confiable y descartan documentos con patrones
+  conocidos de inyección.
+- La reindexación del corpus elimina fuentes de código obsoletas de la
+  colección del proyecto y conserva entradas fuera de `src/`.
+- Los flujos de registro y evaluación migran rutas e IDs obsoletos del índice
+  al verificar una coincidencia exacta de contenido, sin recalcular embeddings.
+- El índice persistente migra automáticamente las rutas del paquete anterior
+  cuando los documentos coinciden exactamente; si no coinciden, solicita
+  reindexación en vez de usar referencias ambiguas.
+- La versión inicial y nueva del prompt de ejemplo muestran huellas abreviadas
+  de 12 caracteres y el diff del Bloque 32.
+
+### Seguridad
+
+- El verificador `revision_gate_2.py` captura `KeyboardInterrupt` durante la
+  carga de módulos y al salir del proceso, informa la cancelación y evita
+  mostrar un traceback de Python.
+- `prompts/versiones_prompt.jsonl` conserva el contenido de prompts para poder
+  reanudar versiones; está excluido de Git y debe tratarse como dato sensible.
+- El filtro de frases es una mitigación parcial: no detecta toda variante de
+  inyección y no reemplaza la supervisión humana.
+- La redacción de PII en trazas es heurística y no reemplaza controles de acceso,
+  retención ni revisión humana.
+
+### Validación
+
+- Ejecutados 185 pruebas locales.
+- `src/GATE_2/unidad_completa_supervision.py` mostró correctamente los tres pasos y el
+  punto de supervisión aprobado.
+- El verificador local renombrado se ejecutó con `--omitir-api`.
+- Las pruebas completas no hicieron llamadas reales a Gemini.
+
 ## [No publicado] - 2026-11-16
 
 ### Añadido
@@ -75,12 +150,12 @@ Los cambios importantes del proyecto se documentan en este archivo.
 
 ### Depurar y consolidar scripts redundantes en la raíz para dejar un único flujo principal de producción
 
-- Se definió `src/GATE_1/cliente.py` como flujo principal para consultar Gemini,
+- Se definió `src/GATE_2/cliente.py` como flujo principal para consultar Gemini,
   con reintentos, validación de respuestas y registro de costos.
-- `src/GATE_1/main.py` y `src/GATE_1/consumir_gemini.py` conservan sus interfaces
+- `src/GATE_2/main.py` y `src/GATE_2/consumir_gemini.py` conservan sus interfaces
   por compatibilidad y delegan las consultas en el cliente principal.
 - Se actualizó el gate para comprobar la delegación y la documentación para
-  indicar el comando recomendado: `python -m src.GATE_1.cliente`.
+  indicar el comando recomendado: `python -m src.GATE_2.cliente`.
 - Validación: 25 pruebas pasaron y el gate local confirmó las comprobaciones del
   flujo. La API real se omitió; el gate aún reporta pendiente la actividad core
   (resultados y revisión manual incompletos).

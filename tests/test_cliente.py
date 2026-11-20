@@ -12,8 +12,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1 import cliente, cliente_reintento, consumir_gemini, main, monolitico
-from src.GATE_1.costo import (
+from src.GATE_2 import cliente, cliente_reintento, consumir_gemini, main, monolitico
+from src.GATE_2.costo import (
     PRECIO_ENTRADA_POR_TOKEN,
     PRECIO_SALIDA_POR_TOKEN,
 )

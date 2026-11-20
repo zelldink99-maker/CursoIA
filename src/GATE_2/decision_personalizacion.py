@@ -10,6 +10,11 @@ import sys
 from google import genai
 from google.genai import errors, types
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RUTA_DECISION_DOCUMENTADA = (
+    PROJECT_ROOT / "docs" / "decision_personalizacion.md"
+)
+
 CLAVES_RESPUESTAS = (
     "informacion_cambia_seguido",
     "problema_de_formato_o_tono",
@@ -129,9 +134,14 @@ def generar_esqueleto_decision(
     return "\n".join(lineas)
 
 
-def main(ruta_salida: str | Path = "decision_personalizacion.md") -> int:
+def main(ruta_salida: str | Path | None = None) -> int:
     """Imprime y guarda un ejemplo completo de decisión sin sobrescribir archivos."""
-    salida = Path(ruta_salida)
+    salida = (
+        RUTA_DECISION_DOCUMENTADA
+        if ruta_salida is None
+        else Path(ruta_salida)
+    )
+    salida.parent.mkdir(parents=True, exist_ok=True)
     if salida.exists():
         print(f"Error: {salida} ya existe; no se sobrescribió.")
         return 1

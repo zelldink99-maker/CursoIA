@@ -11,7 +11,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1 import revisar_cualitativamente
+from src.GATE_2 import revisar_cualitativamente
 
 
 def _resultados(cantidad: int) -> list[dict[str, object]]:
@@ -188,7 +188,7 @@ Revisar manualmente las respuestas con datos verificables.
 
 
 def test_script_es_importable_fuera_de_la_raiz(tmp_path: Path) -> None:
-    script = ROOT_DIR / "src" / "GATE_1" / "revisar_cualitativamente.py"
+    script = ROOT_DIR / "src" / "GATE_2" / "revisar_cualitativamente.py"
     codigo = (
         "import runpy; "
         f"runpy.run_path({str(script)!r}, run_name='import_check')"
@@ -211,7 +211,7 @@ def test_main_carga_resultados_y_guarda_borrador(
     entrada = tmp_path / "resultados.json"
     salida = tmp_path / "revision.json"
     entrada.write_text(json.dumps(_resultados(20)), encoding="utf-8")
-    script = ROOT_DIR / "src" / "GATE_1" / "revisar_cualitativamente.py"
+    script = ROOT_DIR / "src" / "GATE_2" / "revisar_cualitativamente.py"
 
     resultado = subprocess.run(
         [
@@ -238,7 +238,7 @@ def test_main_no_sobrescribe_el_archivo_de_entrada(tmp_path: Path) -> None:
     entrada = tmp_path / "resultados.json"
     contenido = json.dumps(_resultados(1))
     entrada.write_text(contenido, encoding="utf-8")
-    script = ROOT_DIR / "src" / "GATE_1" / "revisar_cualitativamente.py"
+    script = ROOT_DIR / "src" / "GATE_2" / "revisar_cualitativamente.py"
 
     resultado = subprocess.run(
         [

@@ -9,10 +9,10 @@ numerado y pide al modelo responder solo con ese contexto y citar las fuentes.
 Desde la raíz del proyecto:
 
 ```console
-python -m src.GATE_1.recuperacion_citas
+python -m src.GATE_2.recuperacion_citas
 ```
 
-`src/GATE_1/recuperacion_citas.py` indexa el corpus del proyecto con sus
+`src/GATE_2/recuperacion_citas.py` indexa el corpus del proyecto con sus
 metadatos `source` y luego ejecuta dos preguntas de demostración. La búsqueda
 usa `k=3` por defecto. `formatear_contexto` numera cada chunk como `[1]`, `[2]`,
 etc. y conserva el mapa entre número y ruta fuente; `construir_prompt` limita la
@@ -43,7 +43,7 @@ citas inexistentes y el flujo de dos preguntas sin llamar a Gemini.
 - **No hay resultados:** confirma que `vectorstore/` corresponde al índice del
   proyecto y que la indexación terminó correctamente.
 - **Un chunk no tiene `source`:** reindexa con
-  `src/GATE_1/indexar_corpus.py`, que agrega los metadatos de fuente.
+  `src/GATE_2/indexar_corpus.py`, que agrega los metadatos de fuente.
 - **Cita un número que no aparece en el contexto:** el validador detiene la
   respuesta; inspecciona el prompt y la salida del modelo antes de aceptarla.
 - **El modelo no encuentra respuesta:** una abstención es esperable cuando los
