@@ -21,9 +21,9 @@ de consultar el recuperador; no ajustes las etiquetas para mejorar el número.
 
 ## Evaluación real del índice del proyecto
 
-`src/GATE_1/evaluar_recuperacion.py` trae diez preguntas sobre las cinco fuentes
+`src/GATE_2/evaluar_recuperacion.py` trae diez preguntas sobre las cinco fuentes
 incluidas en `indexar_corpus.py`. El corpus actual genera IDs como
-`src/GATE_1/cliente.py::chunk-0`; esos IDs se asignan explícitamente al indexar
+`src/GATE_2/cliente.py::chunk-0`; esos IDs se asignan explícitamente al indexar
 y son parte de las etiquetas. Revisa las etiquetas si cambias el corpus o los
 parámetros de chunking. Amplía el conjunto con preguntas que representen las
 zonas difíciles de tus propios documentos.
@@ -31,8 +31,8 @@ zonas difíciles de tus propios documentos.
 Indexa el corpus si todavía no existe y ejecuta desde la raíz:
 
 ```console
-python -m src.GATE_1.indexar_corpus
-python -m src.GATE_1.evaluar_recuperacion --k 3
+python -m src.GATE_2.indexar_corpus
+python -m src.GATE_2.evaluar_recuperacion --k 3
 ```
 
 La indexación y cada búsqueda calculan embeddings con Gemini; hace falta
@@ -46,7 +46,7 @@ recall y F1. El archivo local está excluido de Git.
 Prueba el trade-off con un `k` mayor y compara ambas corridas:
 
 ```console
-python -m src.GATE_1.evaluar_recuperacion --k 5
+python -m src.GATE_2.evaluar_recuperacion --k 5
 ```
 
 Los valores absolutos dependen del índice y del servicio. Para que las métricas

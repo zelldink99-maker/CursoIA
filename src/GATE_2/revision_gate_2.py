@@ -1,4 +1,4 @@
-"""Revisa los módulos de GATE_1 y genera un reporte local o una prueba API opcional."""
+"""Revisa los módulos de GATE_2 y genera un reporte local o una prueba API opcional."""
 
 from __future__ import annotations
 
@@ -70,6 +70,26 @@ MODULES = {
     "indexar_corpus.py": (
         "Divide e indexa documentación en un vector store Chroma persistente.",
         "Crea al menos cinco chunks con metadatos y permite reconectar al índice.",
+    ),
+    "privacidad_logs.py": (
+        "Redacta datos de contacto detectables antes de guardar trazas.",
+        "Correos y teléfonos reconocidos se sustituyen por marcadores.",
+    ),
+    "seguridad_rag.py": (
+        "Filtra patrones de inyección y separa reglas del contexto recuperado.",
+        "El contexto se trata como dato no confiable y se delimita en mensajes separados.",
+    ),
+    "supervision_riesgos.py": (
+        "Versiona prompts con aprobación humana y puntúa riesgos.",
+        "Una versión pendiente no se activa sin aprobación y despliegue explícitos.",
+    ),
+    "trazas_callbacks.py": (
+        "Captura callbacks del retriever y LLM bajo una traza correlacionada.",
+        "Registra IDs padre y conteos sin persistir pregunta ni respuesta.",
+    ),
+    "unidad_completa_supervision.py": (
+        "Reúne el versionado, el punto LangGraph y la matriz de riesgos.",
+        "Muestra los tres pasos completos sin llamar a Gemini.",
     ),
     "configuracion.py": (
         "Carga y valida el modelo Gemini compartido desde la variable modeloIA.",
@@ -165,7 +185,7 @@ def _codigo_salida(reporte: Reporte) -> int:
 
 def _importar_modulos() -> dict[str, object]:
     """Importa módulos sin lanzar los scripts que hacen llamadas al importarse."""
-    from src.GATE_1 import (
+    from src.GATE_2 import (
         agente_con_herramientas,
         api_test,
         aritmetica,
@@ -185,8 +205,13 @@ def _importar_modulos() -> dict[str, object]:
         monolitico,
         peticiones,
         pipeline_texto,
+        privacidad_logs,
         replica_corpus_ejemplo,
         revisar_cualitativamente,
+        seguridad_rag,
+        supervision_riesgos,
+        trazas_callbacks,
+        unidad_completa_supervision,
     )
     from prompts import banco as banco_prompts
 
@@ -210,14 +235,19 @@ def _importar_modulos() -> dict[str, object]:
         "monolitico": monolitico,
         "peticiones": peticiones,
         "pipeline_texto": pipeline_texto,
+        "privacidad_logs": privacidad_logs,
         "replica_corpus_ejemplo": replica_corpus_ejemplo,
         "revisar_cualitativamente": revisar_cualitativamente,
+        "seguridad_rag": seguridad_rag,
+        "supervision_riesgos": supervision_riesgos,
+        "trazas_callbacks": trazas_callbacks,
+        "unidad_completa_supervision": unidad_completa_supervision,
         "banco_prompts": banco_prompts,
     }
 
 
 def _revisar_sintaxis(reporte: Reporte) -> None:
-    """Analiza los módulos del Gate 1 sin ejecutarlos."""
+    """Analiza los módulos del Gate 2 sin ejecutarlos."""
     archivos = [
         (
             nombre,
@@ -229,7 +259,7 @@ def _revisar_sintaxis(reporte: Reporte) -> None:
         )
         for nombre in MODULES
     ]
-    archivos.append(("revision_gate_1.py", Path(__file__)))
+    archivos.append(("revision_gate_2.py", Path(__file__)))
     for nombre, ruta in archivos:
         try:
             ast.parse(ruta.read_text(encoding="utf-8-sig"), filename=str(ruta))
@@ -1632,7 +1662,7 @@ def main() -> int:
     # La prueba real se puede omitir para ejecutar únicamente verificaciones locales.
     parser = argparse.ArgumentParser(
         description=(
-            "Describe y verifica los módulos de GATE_1 y el banco de prompts. "
+            "Describe y verifica los módulos de GATE_2 y el banco de prompts. "
             "Por defecto comprueba Gemini con una petición real."
         )
     )
@@ -1643,7 +1673,7 @@ def main() -> int:
     )
     argumentos = parser.parse_args()
 
-    print("REVISIÓN DE GATE_1")
+    print("REVISIÓN DE GATE_2")
     print(f"Proyecto: {PROJECT_ROOT}")
     print("\nMÓDULOS Y RESULTADO ESPERADO")
     for nombre, (proposito, esperado) in MODULES.items():
@@ -1656,6 +1686,14 @@ def main() -> int:
     _revisar_sintaxis(reporte)
     try:
         modulos = _importar_modulos()
+    except KeyboardInterrupt:
+        reporte.agregar(
+            "Código ejecutable",
+            "Importaciones del paquete",
+            False,
+            "carga interrumpida por el usuario; vuelve a ejecutar el verificador",
+        )
+        modulos = {}
     except (ImportError, ModuleNotFoundError) as error:
         reporte.agregar(
             "Código ejecutable", "Importaciones del paquete", False, str(error)
@@ -1714,7 +1752,7 @@ def main() -> int:
             "omitida por --omitir-api; vuelve a ejecutar sin esa opción para probarla",
         )
 
-    print("\nCHECKLIST DEL GATE 1")
+    print("\nCHECKLIST DEL GATE 2")
     for grupo in (
         "API funciona",
         "Entorno reproducible",
@@ -1737,4 +1775,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        print(
+            "\nOperación cancelada por el usuario. "
+            "No se completó la revisión.",
+            file=sys.stderr,
+        )
+        raise SystemExit(130)

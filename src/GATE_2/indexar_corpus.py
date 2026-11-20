@@ -29,7 +29,7 @@ CORPUS_DOCUMENTOS = (
             "con backoff exponencial y jitter. No reintenta errores de "
             "autenticación 401/403."
         ),
-        metadata={"source": "src/GATE_1/cliente.py"},
+        metadata={"source": "src/GATE_2/cliente.py"},
     ),
     Document(
         page_content=(
@@ -37,7 +37,7 @@ CORPUS_DOCUMENTOS = (
             "entrada y candidatesTokenCount más thoughtsTokenCount a la tarifa "
             "de salida. El total se estima localmente y no es una factura."
         ),
-        metadata={"source": "src/GATE_1/costo.py"},
+        metadata={"source": "src/GATE_2/costo.py"},
     ),
     Document(
         page_content=(
@@ -45,7 +45,7 @@ CORPUS_DOCUMENTOS = (
             "herramientas. El historial de conversación se separa por "
             "session_id y se conserva en memoria durante el proceso."
         ),
-        metadata={"source": "src/GATE_1/agente_con_herramientas.py"},
+        metadata={"source": "src/GATE_2/agente_con_herramientas.py"},
     ),
     Document(
         page_content=(
@@ -53,7 +53,7 @@ CORPUS_DOCUMENTOS = (
             "argumentos, observaciones y respuesta final. El analizador marca "
             "invocaciones consecutivas de una misma herramienta para revisión."
         ),
-        metadata={"source": "src/GATE_1/trazas_agente.py"},
+        metadata={"source": "src/GATE_2/trazas_agente.py"},
     ),
     Document(
         page_content=(
@@ -150,6 +150,157 @@ def abrir_vectorstore(
     )
 
 
+def validar_fuentes_actuales(vectorstore: Chroma) -> None:
+    """Migra referencias obsoletas verificables y rechaza el resto."""
+    fuentes_actuales = {
+        str(documento.metadata["source"])
+        for documento in CORPUS_DOCUMENTOS
+    }
+    metadatos = vectorstore.get(include=["metadatas"])["metadatas"]
+    fuentes_obsoletas = sorted(
+        {
+            metadata["source"]
+            for metadata in metadatos
+            if metadata
+            and isinstance(metadata.get("source"), str)
+            and metadata["source"].startswith("src/")
+            and metadata["source"] not in fuentes_actuales
+        }
+    )
+    if fuentes_obsoletas:
+        migrar_fuentes_obsoletas(vectorstore)
+        metadatos = vectorstore.get(include=["metadatas"])["metadatas"]
+        fuentes_sin_migrar = {
+            metadata["source"]
+            for metadata in metadatos
+            if metadata
+            and isinstance(metadata.get("source"), str)
+            and metadata["source"].startswith("src/")
+            and metadata["source"] not in fuentes_actuales
+        }
+        if fuentes_sin_migrar:
+            raise ValueError(
+                "El índice contiene fuentes de código que no coinciden con "
+                "el corpus actual. Ejecuta "
+                "python -m src.GATE_2.indexar_corpus para reindexar."
+            )
+
+
+def migrar_fuentes_obsoletas(vectorstore: Chroma) -> int:
+    """Actualiza IDs y fuentes obsoletas al reutilizar embeddings existentes."""
+    datos = vectorstore.get(
+        include=["documents", "metadatas", "embeddings"]
+    )
+    campos_requeridos = ("ids", "documents", "metadatas", "embeddings")
+    if any(datos.get(campo) is None for campo in campos_requeridos):
+        raise ValueError(
+            "No se pueden verificar los documentos y embeddings obsoletos. "
+            "Ejecuta python -m src.GATE_2.indexar_corpus para reindexar."
+        )
+    if len({len(datos[campo]) for campo in campos_requeridos}) != 1:
+        raise ValueError(
+            "El índice tiene registros incompletos; reindexa el corpus."
+        )
+    chunks_actuales = dividir_corpus()
+    fuentes_actuales = {
+        str(documento.metadata["source"])
+        for documento in CORPUS_DOCUMENTOS
+    }
+    chunks_por_contenido = {
+        (
+            str(chunk.metadata["source"]).rsplit("/", 1)[-1],
+            chunk.metadata["chunk_index"],
+            chunk.page_content,
+        ): chunk
+        for chunk in chunks_actuales
+    }
+    ids_existentes = set(datos["ids"])
+    datos_por_id = {
+        identificador: (metadata, contenido)
+        for identificador, metadata, contenido in zip(
+            datos["ids"],
+            datos["metadatas"],
+            datos["documents"],
+        )
+    }
+    adiciones: list[tuple[str, str, dict[str, object], list[float]]] = []
+    ids_antiguos: list[str] = []
+
+    for identificador, metadata, contenido, embedding in zip(
+        datos["ids"],
+        datos["metadatas"],
+        datos["documents"],
+        datos["embeddings"],
+    ):
+        if (
+            not metadata
+            or not isinstance(metadata.get("source"), str)
+            or not metadata["source"].startswith("src/")
+            or metadata["source"] in fuentes_actuales
+        ):
+            continue
+
+        clave = (
+            metadata["source"].rsplit("/", 1)[-1],
+            metadata.get("chunk_index"),
+            contenido,
+        )
+        chunk_actual = chunks_por_contenido.get(clave)
+        if chunk_actual is None:
+            raise ValueError(
+                "No se puede migrar una fuente obsoleta sin una coincidencia "
+                "exacta de contenido. Ejecuta "
+                "python -m src.GATE_2.indexar_corpus para reindexar."
+            )
+
+        id_actual = _ids_para_chunks([chunk_actual])[0]
+        if id_actual in ids_existentes:
+            metadata_existente, contenido_existente = datos_por_id[id_actual]
+            if (
+                contenido_existente != contenido
+                or not metadata_existente
+                or metadata_existente.get("source")
+                != chunk_actual.metadata["source"]
+            ):
+                raise ValueError(
+                    f"El ID destino {id_actual!r} ya existe con otro contenido."
+                )
+            ids_antiguos.append(identificador)
+            continue
+        if embedding is None:
+            raise ValueError(
+                "Falta un embedding almacenado para migrar una fuente obsoleta. "
+                "Ejecuta python -m src.GATE_2.indexar_corpus para reindexar."
+            )
+
+        vector = (
+            embedding.tolist()
+            if hasattr(embedding, "tolist")
+            else list(embedding)
+        )
+        metadatos_actualizados = {
+            **metadata,
+            **chunk_actual.metadata,
+        }
+        adiciones.append(
+            (id_actual, contenido, metadatos_actualizados, vector)
+        )
+        ids_existentes.add(id_actual)
+        ids_antiguos.append(identificador)
+
+    if ids_antiguos:
+        if adiciones:
+            vectorstore._collection.add(
+                ids=[identificador for identificador, *_ in adiciones],
+                documents=[contenido for _, contenido, _, _ in adiciones],
+                metadatas=[metadata for _, _, metadata, _ in adiciones],
+                embeddings=[embedding for _, _, _, embedding in adiciones],
+            )
+        vectorstore.delete(ids=ids_antiguos)
+
+    return len(ids_antiguos)
+
+
 def _persistir_chunks(
     chunks: Sequence[Document],
     embeddings: Embeddings,
@@ -161,9 +312,28 @@ def _persistir_chunks(
 
     vectorstore.add_documents(documents=list(chunks), ids=ids)
 
-    fuentes = list({str(chunk.metadata["source"]) for chunk in chunks})
-    existentes = vectorstore.get(where={"source": {"$in": fuentes}})
-    ids_obsoletos = sorted(set(existentes["ids"]) - set(ids))
+    fuentes = {str(chunk.metadata["source"]) for chunk in chunks}
+    ids_actuales = set(ids)
+    existentes = vectorstore.get()
+    ids_obsoletos = sorted(
+        identificador
+        for identificador, metadata in zip(
+            existentes["ids"],
+            existentes["metadatas"],
+        )
+        if metadata
+        and (
+            (
+                metadata.get("source") in fuentes
+                and identificador not in ids_actuales
+            )
+            or (
+                isinstance(metadata.get("source"), str)
+                and metadata["source"].startswith("src/")
+                and metadata["source"] not in fuentes
+            )
+        )
+    )
     if ids_obsoletos:
         vectorstore.delete(ids=ids_obsoletos)
 

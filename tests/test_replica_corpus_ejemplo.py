@@ -11,7 +11,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1.replica_corpus_ejemplo import (
+from src.GATE_2.replica_corpus_ejemplo import (
     CORPUS_EJEMPLO,
     abrir_vectorstore,
     con_reintentos,
@@ -74,7 +74,7 @@ def test_con_reintentos_usa_backoff_exponencial(
         return "indexado"
 
     monkeypatch.setattr(
-        "src.GATE_1.replica_corpus_ejemplo.time.sleep",
+        "src.GATE_2.replica_corpus_ejemplo.time.sleep",
         dormir,
     )
 
@@ -102,7 +102,7 @@ def test_con_reintentos_propaga_el_error_al_agotar_intentos(
 ) -> None:
     esperas: list[float] = []
     monkeypatch.setattr(
-        "src.GATE_1.replica_corpus_ejemplo.time.sleep",
+        "src.GATE_2.replica_corpus_ejemplo.time.sleep",
         lambda espera: esperas.append(espera),
     )
 

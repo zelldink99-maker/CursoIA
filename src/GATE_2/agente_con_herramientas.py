@@ -31,13 +31,13 @@ else:
     project_root = Path(__file__).resolve().parents[2]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    from src.GATE_1.configuracion import crear_chat_modelo
-    from src.GATE_1.costo import (
+    from src.GATE_2.configuracion import crear_chat_modelo
+    from src.GATE_2.costo import (
         PRECIO_ENTRADA_POR_TOKEN,
         PRECIO_SALIDA_POR_TOKEN,
         calcular_costo,
     )
-    from src.GATE_1.trazas_agente import registrar_traza
+    from src.GATE_2.trazas_agente import registrar_traza
 
 
 @tool
@@ -54,7 +54,7 @@ def buscar_en_documentacion(consulta: str) -> str:
         "costos": (
             "El costo se estima con los tokens de entrada, salida y, si Gemini "
             "lo informa por separado, los tokens de pensamiento. El proyecto "
-            "usa las tarifas configuradas en src/GATE_1/costo.py."
+            "usa las tarifas configuradas en src/GATE_2/costo.py."
         ),
         "tokens": (
             "Gemini informa promptTokenCount, candidatesTokenCount y "

@@ -1,7 +1,7 @@
 # Bloque 22: herramienta estructurada y memoria de conversación
 
 Este bloque amplía el agente del Bloque 21 en
-`src/GATE_1/agente_con_herramientas.py`. El mismo agente conserva la invocación
+`src/GATE_2/agente_con_herramientas.py`. El mismo agente conserva la invocación
 directa y ahora admite una herramienta con esquema Pydantic y una capa de
 historial por sesión.
 
@@ -21,7 +21,7 @@ por defecto se exponen al modelo mediante `args_schema`. Pydantic valida los
 argumentos antes de ejecutar la función; por ejemplo, un contador negativo
 produce `ValidationError` en vez de calcular un costo.
 
-La función sigue usando `calcular_costo` de `src/GATE_1/costo.py`, de modo que
+La función sigue usando `calcular_costo` de `src/GATE_2/costo.py`, de modo que
 las tarifas y el cálculo permanecen en una única implementación.
 
 ## Memoria por sesión
@@ -77,12 +77,12 @@ el entorno:
 python -m pip install -r requirements.txt
 ```
 
-El ejemplo ejecutable de `src/GATE_1/agente_con_herramientas.py` hace dos turnos
+El ejemplo ejecutable de `src/GATE_2/agente_con_herramientas.py` hace dos turnos
 con el mismo `session_id`, utiliza Gemini y puede generar costos. Configura
 `GEMINI_API_KEY` en `.env`; desde la raíz puedes ejecutarlo como módulo:
 
 ```console
-python -m src.GATE_1.agente_con_herramientas
+python -m src.GATE_2.agente_con_herramientas
 ```
 
 Las pruebas locales no usan la API:

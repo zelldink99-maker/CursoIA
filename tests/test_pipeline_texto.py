@@ -12,8 +12,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.GATE_1 import evaluar_salidas
-from src.GATE_1.pipeline_texto import (
+from src.GATE_2 import evaluar_salidas
+from src.GATE_2.pipeline_texto import (
     calcular_metricas,
     calcular_precision_cobertura_f1,
     contar_coincidencias,
@@ -130,7 +130,7 @@ def test_coincidencia_mide_formato_crudo_y_procesado() -> None:
 def test_evaluar_salidas_se_puede_importar_como_script_fuera_de_la_raiz(
     tmp_path: Path,
 ) -> None:
-    script = ROOT_DIR / "src" / "GATE_1" / "evaluar_salidas.py"
+    script = ROOT_DIR / "src" / "GATE_2" / "evaluar_salidas.py"
     codigo = (
         "import runpy; "
         f"runpy.run_path({str(script)!r}, run_name='import_check')"

@@ -11,14 +11,14 @@ vigente del modelo; el archivo de registro no inventa un costo monetario.
 Desde la raíz, registra una consulta:
 
 ```console
-python -m src.GATE_1.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
+python -m src.GATE_2.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
 ```
 
 Para ver en consola el resumen de la actividad de la imagen, ejecuta el modo
 core:
 
 ```console
-python -m src.GATE_1.registro_rag --actividad-core
+python -m src.GATE_2.registro_rag --actividad-core
 ```
 
 Este modo registra tres preguntas distintas con `k=3`, luego repite la primera
@@ -30,7 +30,7 @@ ese costo adicional accidental.
 Se pueden enviar varias preguntas en una ejecución repitiendo `--pregunta`:
 
 ```console
-python -m src.GATE_1.registro_rag --k 3 `
+python -m src.GATE_2.registro_rag --k 3 `
   --pregunta "¿Qué errores reintenta el cliente?" `
   --pregunta "¿Cómo se calcula el costo de Gemini?" `
   --pregunta "¿Qué guarda el sistema en las trazas?"
@@ -44,8 +44,8 @@ Para comprobar cómo cambia la entrada al aumentar `k`, ejecuta la misma pregunt
 con ambos valores:
 
 ```console
-python -m src.GATE_1.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
-python -m src.GATE_1.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 6
+python -m src.GATE_2.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
+python -m src.GATE_2.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 6
 ```
 
 Cada ejecución agrega una línea JSON independiente a
@@ -86,7 +86,7 @@ Antes de gastar cuota, comprueba sin API que el índice exista y esté excluido
 de Git:
 
 ```console
-python -m src.GATE_1.preflight_rag
+python -m src.GATE_2.preflight_rag
 ```
 
 El comando termina con estado `0` y muestra `Preflight OK` si ambas condiciones
@@ -123,7 +123,7 @@ python -m pytest tests/test_preflight_rag.py -q
 - **Falta `GEMINI_API_KEY`:** crea `.env` desde `.env.example` y define la clave
   antes de ejecutar el registro real.
 - **El índice no tiene chunks:** indexa con
-  `python -m src.GATE_1.indexar_corpus` antes de medir; el registro aborta antes
+  `python -m src.GATE_2.indexar_corpus` antes de medir; el registro aborta antes
   de consultar el modelo para no generar una respuesta sin contexto.
 - **No hay resultados o las citas no tienen fuente:** comprueba que el vector
   store sea el del proyecto y que sus documentos tengan metadatos `source`.

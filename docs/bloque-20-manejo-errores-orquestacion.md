@@ -6,7 +6,7 @@ a Gemini.
 
 ## Implementación
 
-El flujo del Bloque 19 está en `src/GATE_1/enrutamiento.py`. En el Bloque 20 se
+El flujo del Bloque 19 está en `src/GATE_2/enrutamiento.py`. En el Bloque 20 se
 agregaron dos niveles de protección:
 
 1. **Fallback en cada ruta.** `construir_cadena_con_enrutamiento` envuelve las

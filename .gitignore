@@ -7,6 +7,7 @@ env/
 .env
 
 # Cachés y compilados de Python
+.pytest_cache/
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -21,6 +22,12 @@ Thumbs.db
 *.log
 trazas_agente.jsonl
 resultados_evaluacion.jsonl
+resultados_metricas.json
+revision_manual.json
+/decision_personalizacion.md
 registros_latencia_costo.jsonl
+trazas_callbacks.jsonl
+prompts/versiones_prompt.jsonl
+prompts/registro_resultados.json
 vectorstore/
 vectorstore_ejemplo/

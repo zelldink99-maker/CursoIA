@@ -31,13 +31,13 @@ resultados.
 
 ## Herramientas de este proyecto
 
-`src/GATE_1/agente_con_herramientas.py` integra un agente para el dominio de
+`src/GATE_2/agente_con_herramientas.py` integra un agente para el dominio de
 soporte y operación del proyecto:
 
 - `buscar_en_documentacion(consulta)` devuelve las políticas documentadas de
   reintentos, costos y metadatos de tokens.
 - `calcular_costo_tokens(tokens_entrada, tokens_salida,
-  tokens_pensamiento=0)` delega el cálculo en `src/GATE_1/costo.py` y usa las
+  tokens_pensamiento=0)` delega el cálculo en `src/GATE_2/costo.py` y usa las
   tarifas configuradas allí. Los contadores inválidos se devuelven como una
   observación explicativa en vez de dejar que la herramienta interrumpa al
   agente.
@@ -63,7 +63,7 @@ python -m pip install -r requirements.txt
 Configura `GEMINI_API_KEY` en `.env` y ejecuta:
 
 ```console
-python -m src.GATE_1.agente_con_herramientas
+python -m src.GATE_2.agente_con_herramientas
 ```
 
 El ejemplo combina una consulta de política con un cálculo de costo. `verbose`
@@ -75,8 +75,8 @@ Para comprobar cada herramienta manualmente desde la raíz, el ejecutor devuelve
 también el rastro programático:
 
 ```python
-from src.GATE_1.agente_con_herramientas import construir_ejecutor_agente
-from src.GATE_1.configuracion import crear_chat_modelo
+from src.GATE_2.agente_con_herramientas import construir_ejecutor_agente
+from src.GATE_2.configuracion import crear_chat_modelo
 
 agente = construir_ejecutor_agente(
     crear_chat_modelo(),

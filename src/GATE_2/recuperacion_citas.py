@@ -6,11 +6,15 @@ import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from langchain_core.callbacks.manager import CallbackManagerForChainRun
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableLambda
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if __package__:
@@ -21,15 +25,23 @@ if __package__:
         crear_embeddings,
         indexar_corpus,
     )
+    from .seguridad_rag import (
+        construir_mensajes,
+        filtrar_documentos_sospechosos,
+    )
 else:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
-    from src.GATE_1.configuracion import crear_chat_modelo
-    from src.GATE_1.indexar_corpus import (
+    from src.GATE_2.configuracion import crear_chat_modelo
+    from src.GATE_2.indexar_corpus import (
         CORPUS_DOCUMENTOS,
         RUTA_VECTORSTORE,
         crear_embeddings,
         indexar_corpus,
+    )
+    from src.GATE_2.seguridad_rag import (
+        construir_mensajes,
+        filtrar_documentos_sospechosos,
     )
 
 if TYPE_CHECKING:
@@ -72,23 +84,12 @@ def formatear_contexto(
     return "\n\n".join(fragmentos), fuentes
 
 
-def construir_prompt(pregunta: str, contexto: str) -> str:
-    """Construye una instrucción que restringe respuestas y citas al contexto."""
-    if not isinstance(pregunta, str) or not pregunta.strip():
-        raise ValueError("La pregunta debe ser un texto no vacío.")
-    if not isinstance(contexto, str):
-        raise ValueError("El contexto debe ser texto.")
-
-    contexto_final = contexto.strip() or "No se recuperó contexto pertinente."
-    return (
-        "Responde la pregunta usando SOLO el contexto de abajo. "
-        "Cita cada afirmación factual con el número de su fuente entre "
-        "corchetes, por ejemplo [1]. Si el contexto no alcanza para responder, "
-        "dilo explícitamente en vez de inventar.\n\n"
-        f"Contexto:\n{contexto_final}\n\n"
-        f"Pregunta: {pregunta.strip()}\n"
-        "Respuesta:"
-    )
+def construir_prompt(
+    pregunta: str,
+    contexto: str,
+) -> list[SystemMessage | HumanMessage]:
+    """Construye mensajes separados y delimita el contexto como dato."""
+    return construir_mensajes(pregunta, contexto)
 
 
 def validar_citas(respuesta: str, fuentes: dict[int, str]) -> None:
@@ -120,6 +121,7 @@ def responder_con_citas(
     modelo: BaseChatModel,
     *,
     cantidad_resultados: int = 3,
+    callbacks: list[BaseCallbackHandler] | None = None,
 ) -> tuple[str, dict[int, str]]:
     """Recupera documentos, consulta el modelo y retorna respuesta y fuentes."""
     if not isinstance(pregunta, str) or not pregunta.strip():
@@ -131,12 +133,46 @@ def responder_con_citas(
     ):
         raise ValueError("cantidad_resultados debe ser un entero positivo.")
 
-    documentos = vectorstore.similarity_search(
-        pregunta,
-        k=cantidad_resultados,
-    )
-    contexto, fuentes = formatear_contexto(documentos)
-    resultado = modelo.invoke(construir_prompt(pregunta, contexto))
+    if callbacks:
+        retriever = vectorstore.as_retriever(
+            search_kwargs={"k": cantidad_resultados}
+        )
+
+        def ejecutar(
+            entrada: dict[str, str],
+            run_manager: CallbackManagerForChainRun,
+        ) -> dict[str, Any]:
+            callbacks_hijo = run_manager.get_child()
+            documentos = retriever.invoke(
+                entrada["pregunta"],
+                config={"callbacks": callbacks_hijo},
+            )
+            documentos_limpios, _ = filtrar_documentos_sospechosos(documentos)
+            contexto, fuentes = formatear_contexto(documentos_limpios)
+            resultado = modelo.invoke(
+                construir_prompt(pregunta, contexto),
+                config={"callbacks": callbacks_hijo},
+            )
+            return {
+                "resultado": resultado,
+                "fuentes": fuentes,
+            }
+
+        salida = RunnableLambda(ejecutar).invoke(
+            {"pregunta": pregunta},
+            config={"callbacks": callbacks},
+        )
+        fuentes = salida["fuentes"]
+        resultado = salida["resultado"]
+    else:
+        documentos = vectorstore.similarity_search(
+            pregunta,
+            k=cantidad_resultados,
+        )
+        documentos_limpios, _ = filtrar_documentos_sospechosos(documentos)
+        contexto, fuentes = formatear_contexto(documentos_limpios)
+        resultado = modelo.invoke(construir_prompt(pregunta, contexto))
+
     contenido = resultado.content
     if isinstance(contenido, str):
         respuesta = contenido

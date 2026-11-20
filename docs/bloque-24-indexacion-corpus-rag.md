@@ -7,7 +7,7 @@ Gemini; las pruebas automatizadas no las hacen.
 
 ## Flujo de indexación
 
-`src/GATE_1/indexar_corpus.py` incluye cinco documentos breves del proyecto:
+`src/GATE_2/indexar_corpus.py` incluye cinco documentos breves del proyecto:
 reintentos, cálculo de costos, agente y memoria, trazas, y pruebas locales.
 `RecursiveCharacterTextSplitter` los divide en fragmentos de hasta 400
 caracteres, con 60 caracteres de solapamiento para conservar contexto cuando
@@ -24,7 +24,7 @@ Desde la raíz, instala las dependencias y ejecuta:
 
 ```console
 python -m pip install -r requirements.txt
-python -m src.GATE_1.indexar_corpus
+python -m src.GATE_2.indexar_corpus
 ```
 
 Al ejecutar el indexador, la salida muestra tres pasos: división e
@@ -48,7 +48,7 @@ cuenta los registros almacenados sin volver a indexar los documentos ni llamar
 a `from_documents`:
 
 ```python
-from src.GATE_1.indexar_corpus import abrir_vectorstore, crear_embeddings
+from src.GATE_2.indexar_corpus import abrir_vectorstore, crear_embeddings
 
 vectorstore = abrir_vectorstore(crear_embeddings())
 print(vectorstore._collection.count())  # 5
@@ -78,7 +78,7 @@ Para ejecutar el flujo completo (reindexación con metadatos, búsqueda de
 fragmentos y respuesta con referencias a la fuente), usa:
 
 ```console
-python -m src.GATE_1.recuperacion_citas
+python -m src.GATE_2.recuperacion_citas
 ```
 
 El script reindexa los cinco documentos mediante `indexar_corpus`, por lo que
@@ -87,7 +87,7 @@ de demostración. `formatear_contexto` antepone `[1]`, `[2]`, etc. a cada
 fragmento y genera un mapa de número a ruta; `construir_prompt` indica que el
 modelo responda solo con ese contexto, cite sus afirmaciones y reconozca cuando
 no haya información suficiente. La salida muestra la respuesta generada y el
-mapa de fuentes, por ejemplo `citas: {1: 'src/GATE_1/cliente.py'}`.
+mapa de fuentes, por ejemplo `citas: {1: 'src/GATE_2/cliente.py'}`.
 El script también rechaza citas a números que no se recuperaron y respuestas
 sin referencias cuando sí había contexto.
 
@@ -125,7 +125,7 @@ El verificador general también comprueba el chunking local, sin generar
 embeddings:
 
 ```console
-python src/GATE_1/revision_gate_1.py --omitir-api
+python src/GATE_2/revision_gate_2.py --omitir-api
 ```
 
 ## Problemas frecuentes

@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.GATE_1 import configuracion
+from src.GATE_2 import configuracion
 
 
 @pytest.mark.parametrize(

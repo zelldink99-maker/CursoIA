@@ -79,15 +79,15 @@ aplican PEP 668.
 Desde la raíz del repositorio ejecuta:
 
 ```console
-python src/GATE_1/latencia.py
+python src/GATE_2/latencia.py
 ```
 
-La clase `Latencia`, definida en `src/GATE_1/latencia.py`, realiza cuatro
+La clase `Latencia`, definida en `src/GATE_2/latencia.py`, realiza cuatro
 solicitudes con la pregunta de prueba predeterminada. Informa el tiempo de cada
 solicitud, el promedio y una estimación del costo de la última respuesta.
 Todos los clientes leen el modelo de `modeloIA` en `.env`; el valor
 predeterminado es `gemini-3.8-flash`. Ejecuta el archivo directamente como se
-muestra; no uses `-m src.GATE_1.latencia`, ya que sus imports de módulos
+muestra; no uses `-m src.GATE_2.latencia`, ya que sus imports de módulos
 hermanos no están configurados para la ejecución como módulo de paquete.
 
 ## Consultar tokens de una respuesta
@@ -96,10 +96,10 @@ La respuesta JSON de Gemini se conserva completa al volver de
 `enviar_peticion`; además del contenido generado puede incluir `usageMetadata`
 con los tokens de entrada, salida y total. `monolitico.py` proporciona el
 transporte de bajo nivel usado por el cliente principal. Para consultar el
-modelo en el flujo de producción, usa `src/GATE_1/cliente.py`, que aplica
+modelo en el flujo de producción, usa `src/GATE_2/cliente.py`, que aplica
 reintentos y registra el costo con los metadatos de uso.
 
-El módulo `src/GATE_1/costo.py` calcula el costo a partir del uso reportado y
+El módulo `src/GATE_2/costo.py` calcula el costo a partir del uso reportado y
 los precios oficiales documentados para Gemini 3.8 Flash. Si seleccionas otro
 modelo en `modeloIA`, verifica y actualiza primero sus tarifas: el estimador usa
 las constantes actuales de 3.8 Flash. Consulta
@@ -109,7 +109,7 @@ El modelo aceptado y el factory común de LangChain se prueban sin red con
 
 ## Cliente modular: reintentos y costo por operación
 
-El cliente `src/GATE_1/cliente.py` ofrece `consultar_modelo(pregunta)` como
+El cliente `src/GATE_2/cliente.py` ofrece `consultar_modelo(pregunta)` como
 interfaz única: valida y arma la solicitud, consulta Gemini, extrae el texto y
 registra el costo estimado de cada respuesta exitosa. La instrucción del sistema
 es opcional; si no se entrega, se usa una instrucción predeterminada no vacía,
@@ -125,7 +125,7 @@ metadatos válidos, el cliente informa el error en vez de asignar un costo
 inventado. `costo_total_sesion` guarda el acumulado en memoria mientras el
 proceso está en ejecución; no se persiste en disco ni representa una factura.
 
-`src/GATE_1/cliente_reintento.py` reintenta errores transitorios (429, 5xx,
+`src/GATE_2/cliente_reintento.py` reintenta errores transitorios (429, 5xx,
 timeout y conexión) hasta tres intentos totales por defecto. Entre intentos
 aplica backoff exponencial con jitter y un techo de 30 segundos por espera. Los
 mensajes de reintento indican el número de intento y la espera calculada. No
@@ -139,10 +139,10 @@ Desde la raíz, ejecuta el único flujo principal de consulta. Llama una vez a
 `consultar_modelo`, imprime la respuesta y el costo acumulado:
 
 ```console
-python -m src.GATE_1.cliente
+python -m src.GATE_2.cliente
 ```
 
-`src/GATE_1/main.py` se conserva como lanzador compatible y
+`src/GATE_2/main.py` se conserva como lanzador compatible y
 `consumir_gemini.py` como interfaz de compatibilidad; ambos delegan en este
 mismo cliente. Para nuevas ejecuciones, usa el comando anterior.
 
@@ -152,7 +152,7 @@ Para ejecutar las diez preguntas de prueba (cada una puede generar costo), usa
 desde la raíz:
 
 ```console
-python -c "from src.GATE_1.cliente import ejecutar_ensayo; raise SystemExit(ejecutar_ensayo())"
+python -c "from src.GATE_2.cliente import ejecutar_ensayo; raise SystemExit(ejecutar_ensayo())"
 ```
 
 El ensayo imprime la respuesta resumida y, debajo, los tokens reportados, el
@@ -196,7 +196,7 @@ python -m pip install -r requirements.txt
 El verificador general local también ejecuta comprobaciones simuladas:
 
 ```console
-python src/GATE_1/revision_gate_1.py --omitir-api
+python src/GATE_2/revision_gate_2.py --omitir-api
 ```
 
 ## Pipeline de texto y evaluación de salidas
@@ -204,15 +204,15 @@ python src/GATE_1/revision_gate_1.py --omitir-api
 Además de la consulta a Gemini, el proyecto incluye un flujo local para limpiar,
 comparar y evaluar texto antes de interpretar la respuesta del modelo:
 
-- `src/GATE_1/pipeline_texto.py`: limpia el texto, elimina puntuación y espacios
+- `src/GATE_2/pipeline_texto.py`: limpia el texto, elimina puntuación y espacios
   extra, tokeniza, genera conteos por palabra y calcula coincidencias,
   precisión, cobertura y F1 sin perder las repeticiones.
-- `src/GATE_1/evaluar_salidas.py`: compara la respuesta del modelo con una
+- `src/GATE_2/evaluar_salidas.py`: compara la respuesta del modelo con una
   referencia usando métricas sobre texto crudo y texto normalizado.
-- `src/GATE_1/evaluar_metricas.py`: evalúa varias respuestas reales, conserva
+- `src/GATE_2/evaluar_metricas.py`: evalúa varias respuestas reales, conserva
   respuesta y métricas en `resultados_metricas.json`, calcula promedios y
   muestra primero los casos con menor F1.
-- `src/GATE_1/revisar_cualitativamente.py`: prepara una muestra de los F1 más
+- `src/GATE_2/revisar_cualitativamente.py`: prepara una muestra de los F1 más
   bajos y más altos en `revision_manual.json`, lista para completar a mano
   con una rúbrica de corrección factual, completitud y contradicción.
 
@@ -228,7 +228,7 @@ Para ejecutar el conjunto de tres consultas de ejemplo desde la raíz (cada
 consulta puede generar costo de API):
 
 ```console
-python -m src.GATE_1.evaluar_metricas
+python -m src.GATE_2.evaluar_metricas
 ```
 
 El archivo JSON se actualiza después de cada respuesta exitosa, de modo que
@@ -237,7 +237,7 @@ generar los 20 resultados requeridos por la actividad core (20 consultas, que
 pueden generar costo de API), ejecuta de forma explícita:
 
 ```console
-python -m src.GATE_1.evaluar_metricas --actividad-core
+python -m src.GATE_2.evaluar_metricas --actividad-core
 ```
 
 Este modo guarda el lote en `resultados_actividad_core.json` para no sobrescribir
@@ -247,7 +247,7 @@ pendientes. Después, prepara la muestra para revisar sin volver a llamar a la
 API:
 
 ```console
-python -m src.GATE_1.revisar_cualitativamente
+python -m src.GATE_2.revisar_cualitativamente
 ```
 
 El comando selecciona cinco casos con F1 más bajo y cinco con F1 más alto, y
@@ -288,7 +288,7 @@ python -m pytest tests/test_revisar_cualitativamente.py -q
 
 ## LangChain: primera chain de tres pasos (Bloque 18)
 
-El proyecto incluye `src/GATE_1/cadena_tres_pasos.py`, que transforma texto
+El proyecto incluye `src/GATE_2/cadena_tres_pasos.py`, que transforma texto
 técnico mediante tres etapas encadenadas:
 
 1. Extrae tres puntos clave.
@@ -309,7 +309,7 @@ python -m pip install -r requirements.txt
 Para ejecutar la chain real desde la raíz del proyecto:
 
 ```console
-python -m src.GATE_1.cadena_tres_pasos
+python -m src.GATE_2.cadena_tres_pasos
 ```
 
 La ejecución requiere `GEMINI_API_KEY` en `.env` y realiza tres llamadas al
@@ -321,7 +321,7 @@ python -m pytest tests/test_cadena_tres_pasos.py -q
 
 ## LangChain: enrutamiento condicional (Bloque 19)
 
-`src/GATE_1/enrutamiento.py` clasifica mensajes de soporte como `pregunta`,
+`src/GATE_2/enrutamiento.py` clasifica mensajes de soporte como `pregunta`,
 `queja` o `sugerencia`, normaliza la clasificación y dirige el mensaje a un
 prompt específico. La ruta de pregunta también es la ruta por defecto para
 categorías desconocidas. `construir_cadena(modelo)` permite probar el flujo con
@@ -332,7 +332,7 @@ separado.
 Para ejecutar un ejemplo con Gemini desde la raíz del proyecto:
 
 ```console
-python -m src.GATE_1.enrutamiento
+python -m src.GATE_2.enrutamiento
 ```
 
 Requiere `GEMINI_API_KEY` en `.env` y realiza dos llamadas al modelo (una para
@@ -350,9 +350,9 @@ Bloque 20 están documentados en
 
 ## LangChain: primer agente con herramientas (Bloque 21)
 
-`src/GATE_1/agente_con_herramientas.py` construye un agente de soporte con dos
+`src/GATE_2/agente_con_herramientas.py` construye un agente de soporte con dos
 herramientas: búsqueda de documentación del proyecto y estimación del costo
-por tokens usando `src/GATE_1/costo.py`. A diferencia de la chain enrutada del
+por tokens usando `src/GATE_2/costo.py`. A diferencia de la chain enrutada del
 Bloque 19, el modelo decide si responde directamente o qué herramienta invocar.
 El agente conserva las acciones y observaciones en `intermediate_steps`.
 
@@ -364,7 +364,7 @@ Instálalas con `python -m pip install -r requirements.txt`; configura
 `GEMINI_API_KEY` en `.env` y ejecuta desde la raíz:
 
 ```console
-python -m src.GATE_1.agente_con_herramientas
+python -m src.GATE_2.agente_con_herramientas
 ```
 
 La ejecución usa Gemini y puede generar costos. Las pruebas usan un modelo
@@ -402,7 +402,7 @@ Consulta [docs/bloque-23-autonomia-y-trazas.md](docs/bloque-23-autonomia-y-traza
 y ejecuta el analizador desde la raíz:
 
 ```console
-python -c "from src.GATE_1.trazas_agente import marcar_repeticiones_sospechosas; marcar_repeticiones_sospechosas()"
+python -c "from src.GATE_2.trazas_agente import marcar_repeticiones_sospechosas; marcar_repeticiones_sospechosas()"
 ```
 
 Las pruebas del registro y el análisis no llaman a Gemini:
@@ -413,7 +413,7 @@ python -m pytest tests/test_trazas_agente.py -q
 
 ## RAG: indexación del corpus y embeddings (Bloque 24)
 
-`src/GATE_1/indexar_corpus.py` divide cinco documentos cortos del proyecto con
+`src/GATE_2/indexar_corpus.py` divide cinco documentos cortos del proyecto con
 `RecursiveCharacterTextSplitter`, los vectoriza con `gemini-embedding-001` y
 persiste los chunks en Chroma bajo `vectorstore/`. La carpeta generada está
 excluida de Git. La indexación y la búsqueda semántica hacen llamadas reales a
@@ -423,7 +423,7 @@ Instala las dependencias actualizadas y corre el indexador desde la raíz:
 
 ```console
 python -m pip install -r requirements.txt
-python -m src.GATE_1.indexar_corpus
+python -m src.GATE_2.indexar_corpus
 ```
 
 El indexador informa el chunking y la indexación, lista los archivos creados
@@ -447,7 +447,7 @@ esperado y el troubleshooting de instalaciones, clave, cuota, persistencia y
 colecciones. Para ejecutarla con Gemini:
 
 ```console
-python -m src.GATE_1.replica_corpus_ejemplo
+python -m src.GATE_2.replica_corpus_ejemplo
 ```
 
 La ejecución requiere una clave válida en `.env` y puede consumir cuota de la
@@ -463,13 +463,13 @@ para los pasos detallados y la guía de troubleshooting de vector stores.
 
 ### Bloque 26: recuperar contexto y responder con citas
 
-`src/GATE_1/recuperacion_citas.py` reindexa el corpus del proyecto con sus
+`src/GATE_2/recuperacion_citas.py` reindexa el corpus del proyecto con sus
 metadatos, recupera los fragmentos pertinentes y consulta el modelo configurado
 por `modeloIA`. El prompt limita la respuesta al contexto y solicita citas
 numeradas; el script imprime las rutas fuente asociadas a cada número.
 
 ```console
-python -m src.GATE_1.recuperacion_citas
+python -m src.GATE_2.recuperacion_citas
 python -m pytest tests/test_recuperacion_citas.py -q
 ```
 
@@ -481,27 +481,27 @@ flujo, la validación de citas y los problemas frecuentes.
 
 ### Evaluar recuperación y registrar latencia/costo (Bloques 27-28)
 
-`src/GATE_1/evaluar_recuperacion.py` calcula precisión, recall y F1 por
+`src/GATE_2/evaluar_recuperacion.py` calcula precisión, recall y F1 por
 pregunta para diez casos etiquetados sobre el corpus actual. La evaluación
 consulta el índice real con embeddings de Gemini y agrega cada corrida a
 `resultados_evaluacion.jsonl`, conservando `k`, chunking y resultados
 individuales:
 
 ```console
-python -m src.GATE_1.evaluar_recuperacion --k 3
+python -m src.GATE_2.evaluar_recuperacion --k 3
 python -m pytest tests/test_evaluacion_recuperacion.py -q
 ```
 
-`src/GATE_1/registro_rag.py` mide embedding+búsqueda y generación, y guarda los
+`src/GATE_2/registro_rag.py` mide embedding+búsqueda y generación, y guarda los
 tokens reales de `usage_metadata`, que permiten estimar el costo según las
 tarifas vigentes del modelo. Cada consulta agrega una línea a
 `registros_latencia_costo.jsonl`:
 
 ```console
-python -m src.GATE_1.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
-python -m src.GATE_1.registro_rag --actividad-core
+python -m src.GATE_2.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
+python -m src.GATE_2.registro_rag --actividad-core
 python -m pytest tests/test_registro_rag.py -q
-python -m src.GATE_1.preflight_rag
+python -m src.GATE_2.preflight_rag
 ```
 
 `--actividad-core` imprime en consola las tres consultas, la comparación de
@@ -523,8 +523,8 @@ consistente. Comprueba los requisitos locales sin llamar a Gemini y ejecuta la
 validación del dataset con:
 
 ```console
-python -m src.GATE_1.verificar_entorno
-python -m src.GATE_1.dataset_tuning
+python -m src.GATE_2.verificar_entorno
+python -m src.GATE_2.dataset_tuning
 python -m pytest tests/test_dataset_tuning.py -q
 ```
 
@@ -539,10 +539,10 @@ de trabajo, criterios de elección, ejercicio propio y errores frecuentes:
 El Bloque 30 estima el costo humano del etiquetado, compara RAG, fine-tuning
 completo y PEFT con un método que informa empates, y genera el esqueleto de la
 decisión fundamentada para tu proyecto. Para mostrar en consola una decisión
-de ejemplo completa y guardarla como `decision_personalizacion.md`, ejecuta:
+de ejemplo completa y guardarla en `docs/decision_personalizacion.md`, ejecuta:
 
 ```console
-python -m src.GATE_1.decision_personalizacion
+python -m src.GATE_2.decision_personalizacion
 ```
 
 El ejemplo no usa la API y el comando no sobrescribe un documento existente.
@@ -556,15 +556,58 @@ La consulta de estadísticas de un trabajo de tuning existente es opcional y no
 inicia entrenamiento. La guía completa y los ejercicios están en
 [docs/bloque-30-decision-personalizacion.md](docs/bloque-30-decision-personalizacion.md).
 
-## Revisar GATE_1
+### Bloque 32: unidad completa de versionado, supervisión y riesgos
+
+El Bloque 32 reúne en un solo archivo la actividad completa, sin llamadas a
+Gemini. Ejecuta el versionado y diff del prompt, el punto de supervisión con
+LangGraph y la matriz de cinco riesgos:
+
+```console
+python -m src.GATE_2.unidad_completa_supervision
+```
+
+La salida incluye huellas inicial y nueva, el diff, el punto pendiente,
+la activación aprobada y los riesgos ordenados por puntaje.
+
+El módulo está localizado en `src/GATE_2/unidad_completa_supervision.py` y se
+ejecuta por el nombre del paquete. No requiere Gemini ni genera archivos.
+
+La entrega detallada y el significado de cada salida están en
+[docs/bloque-32-supervision-matriz.md](docs/bloque-32-supervision-matriz.md).
+
+### Seguridad, trazas y supervisión humana (Bloque 31)
+
+El Bloque 31 separa roles y delimita contexto no confiable en RAG, filtra
+patrones conocidos de inyección, correlaciona callbacks y registra consultas
+por `trace_id` sin guardar pregunta ni contexto. Las trazas del agente también
+redactan correos y teléfonos detectables. Además, versiona prompts con
+aprobación explícita antes de activarlos y ordena una matriz de riesgos por
+probabilidad e impacto. Las defensas son heurísticas y no eliminan todos los
+riesgos. Si el vector store conserva rutas del paquete anterior, el código
+migra IDs y metadatos cuando el contenido coincide exactamente, sin recalcular
+embeddings.
+
+```console
+python -m src.GATE_2.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
+python -m src.GATE_2.registro_rag --demo-trazas
+python -m src.GATE_2.supervision_riesgos
+python -m pytest tests/test_seguridad_rag.py tests/test_trazas_callbacks.py tests/test_supervision_riesgos.py tests/test_privacidad_logs.py -q
+```
+
+Las consultas reales a RAG requieren credenciales y pueden consumir cuota; las
+pruebas y la matriz de riesgos no llaman a servicios externos. La guía con el
+flujo de aprobación, límites, ejemplo de callbacks y política de logs está en
+[docs/bloque-31-seguridad-trazas-supervision.md](docs/bloque-31-seguridad-trazas-supervision.md).
+
+## Revisar GATE_2
 
 Desde la raíz del repositorio ejecuta el verificador:
 
 ```console
-python src/GATE_1/revision_gate_1.py
+python src/GATE_2/revision_gate_2.py
 ```
 
-Describe los módulos de GATE_1 y el banco de prompts; valida sintaxis,
+Describe los módulos de GATE_2 y el banco de prompts; valida sintaxis,
 dependencias, imports y credenciales, y ejecuta pruebas locales simuladas,
 incluidas las de clasificación de errores, reintentos, backoff, costo por
 operación y validación de respuestas. También incorpora la revisión de
@@ -579,8 +622,11 @@ resultados, la revisión manual o los hallazgos documentados.
 Para ejecutar solo comprobaciones locales sin llamar a la API real:
 
 ```console
-python src/GATE_1/revision_gate_1.py --omitir-api
+python src/GATE_2/revision_gate_2.py --omitir-api
 ```
+
+Si se cancela la carga o ejecución con Ctrl+C, el verificador informa la
+cancelación y termina sin mostrar el traceback de Python.
 
 ## Decisión de arquitectura
 
@@ -599,11 +645,12 @@ la respuesta es consistente entre varios intentos.
 
 - [docs/decision-arquitectura.md](docs/decision-arquitectura.md): decisiones de modelo, arquitectura y cálculo de costos.
 - [docs/limites_metrica.md](docs/limites_metrica.md): límites conocidos de precisión, cobertura y F1, rúbrica y recomendación de revisión manual.
+- [docs/decision_personalizacion.md](docs/decision_personalizacion.md): ejemplo documentado de la decisión de personalización del Bloque 30.
 - [docs/registro_resultados.txt](docs/registro_resultados.txt): registro de resultados de pruebas y evaluaciones del proyecto.
 
 ## Notas importantes
 
-- Los módulos de `src/GATE_1` están pensados para ejecutarse como scripts desde la raíz del proyecto.
+- Los módulos de `src/GATE_2` están pensados para ejecutarse como scripts desde la raíz del proyecto.
 - Si la variable `GEMINI_API_KEY` no existe o conserva el valor de ejemplo, la aplicación falla con un error explícito para evitar llamadas no autenticadas.
 - En caso de 429, 5xx, timeout o problemas de conexión, el cliente modular reintenta automáticamente hasta un máximo configurado.
 - Los errores de autenticación (401/403) se consideran permanentes y no se reintentan.

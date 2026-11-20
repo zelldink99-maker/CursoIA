@@ -13,9 +13,9 @@ else:
     project_root = Path(__file__).resolve().parents[2]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    from src.GATE_1 import monolitico
-    from src.GATE_1.cliente_reintento import con_reintento
-    from src.GATE_1.costo import calcular_costo
+    from src.GATE_2 import monolitico
+    from src.GATE_2.cliente_reintento import con_reintento
+    from src.GATE_2.costo import calcular_costo
 
 INSTRUCCION_PREDETERMINADA = "Responde de forma clara y concisa."
 costo_total_sesion = 0.0

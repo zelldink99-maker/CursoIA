@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .privacidad_logs import redactar_pii
+
 
 def registrar_traza(
     session_id: str,
@@ -19,16 +21,16 @@ def registrar_traza(
     registro = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": session_id,
-        "entrada": entrada,
+        "entrada": redactar_pii(entrada),
         "acciones": [
             {
                 "herramienta": accion.tool,
-                "argumentos": accion.tool_input,
-                "observacion": observacion,
+                "argumentos": redactar_pii(accion.tool_input),
+                "observacion": redactar_pii(observacion),
             }
             for accion, observacion in resultado.get("intermediate_steps", [])
         ],
-        "respuesta_final": resultado["output"],
+        "respuesta_final": redactar_pii(resultado["output"]),
     }
 
     with Path(archivo).open("a", encoding="utf-8") as destino:
