@@ -33,21 +33,33 @@ def test_registro_se_ejecuta_como_script_fuera_de_la_raiz(
     assert "--pregunta PREGUNTA" in resultado.stdout
 
 
-def test_demo_trazas_imprime_dos_consultas_y_un_trace_separado(
+def test_demo_trazas_imprime_pipeline_dos_consultas_y_contexto_no_confiable(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert registro_rag.main(["--demo-trazas"]) == 0
 
     salida = capsys.readouterr().out
-    assert "PASO 1: consulta 1" in salida
-    assert "PASO 2: consulta 2" in salida
-    assert '"n_patrones": 3' in salida
-    assert '"n_limpios": 1' in salida
-    assert '"n_descartados": 1' in salida
-    assert '"n_descartados": 0' in salida
-    assert '"input_tokens": 210' in salida
-    assert '"total_tokens": 228' in salida
+    assert "PASO 1: indexar, recuperar, filtrar y responder (con traza)" in salida
+    assert (
+        "respuesta final: Según el manual.pdf, la política de devoluciones "
+        "permite 30 días."
+    ) in salida
+    assert "PASO 2: dos consultas seguidas, cada una con su trace_id" in salida
+    assert salida.count('"evento": "consulta_recibida"') == 3
+    assert salida.count('"evento": "documentos_recuperados"') == 3
+    assert salida.count('"evento": "consumo_llm"') == 3
+    assert '"trace_id": "trace-2193"' in salida
+    assert '"trace_id": "trace-1385"' in salida
     assert "trace_id fuera de cualquier consulta: None" in salida
+    assert "PASO 3: si todo el contexto recuperado es sospechoso" in salida
+    assert (
+        '"evento": "sin_contexto_confiable", "trace_id": "trace-7421", '
+        '"n_recuperados": 1, "n_descartados": 1'
+    ) in salida
+    assert (
+        "No tengo información suficiente y verificada para responder esto."
+        in salida
+    )
 
 
 def test_main_normal_imprime_pasos_y_eventos_reales(
