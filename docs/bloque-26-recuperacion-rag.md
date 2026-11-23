@@ -14,7 +14,11 @@ python -m src.GATE_2.recuperacion_citas
 
 `src/GATE_2/recuperacion_citas.py` indexa el corpus del proyecto con sus
 metadatos `source` y luego ejecuta dos preguntas de demostración. La búsqueda
-usa `k=3` por defecto. `formatear_contexto` numera cada chunk como `[1]`, `[2]`,
+usa `k=1` por defecto, valor seleccionado tras comparar el corpus del proyecto
+con diez preguntas: precisión@1, recall@1 y F1@1 fueron 1.000 en esa muestra.
+El conjunto tiene una sola fuente relevante etiquetada por pregunta; valida la
+recuperación en este corpus, no la calidad de las respuestas generadas ni otros
+corpus. `formatear_contexto` numera cada chunk como `[1]`, `[2]`,
 etc. y conserva el mapa entre número y ruta fuente; `construir_prompt` limita la
 respuesta al contexto e indica que el modelo admita cuando no alcance para
 responder. `validar_citas` rechaza referencias a números que no se recuperaron

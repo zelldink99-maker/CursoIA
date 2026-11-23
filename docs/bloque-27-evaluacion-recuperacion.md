@@ -32,8 +32,17 @@ Indexa el corpus si todavía no existe y ejecuta desde la raíz:
 
 ```console
 python -m src.GATE_2.indexar_corpus
+python -m src.GATE_2.evaluar_recuperacion --k 1
+python -m src.GATE_2.evaluar_recuperacion --k 2
 python -m src.GATE_2.evaluar_recuperacion --k 3
 ```
+
+En la medición del **23 de noviembre de 2026** sobre las diez preguntas del
+corpus, `k=1` obtuvo precisión/recall/F1 de **1.000/1.000/1.000**; `k=2`,
+**0.500/1.000/0.667**; y la corrida anterior con `k=3`,
+**0.333/1.000/0.500**. Por eso el servicio RAG usa ahora `k=1` por defecto.
+La muestra etiqueta un chunk relevante por pregunta y es pequeña; confirma las
+etiquetas y amplía preguntas antes de generalizar el resultado.
 
 La indexación y cada búsqueda calculan embeddings con Gemini; hace falta
 `GEMINI_API_KEY` y las llamadas pueden consumir cuota. El script imprime una

@@ -32,8 +32,9 @@ El prompt tiene dos espacios con propósitos distintos:
    ejecutor del Bloque 21 siga admitiendo invocaciones directas.
 2. `agent_scratchpad` contiene acciones y observaciones de la invocación actual.
 
-`construir_agente_con_memoria(ejecutor)` envuelve el `AgentExecutor` con
-`RunnableWithMessageHistory`. Cada llamada a la capa de memoria requiere:
+`construir_agente_con_memoria(ejecutor)` construye un `StateGraph` de LangGraph
+con `InMemorySaver` y adapta el `AgentExecutor`. Cada llamada a la capa de
+memoria requiere:
 
 ```python
 config = {"configurable": {"session_id": "cliente-123"}}
@@ -43,12 +44,12 @@ resultado = agente_con_memoria.invoke(
 )
 ```
 
-`obtener_historial(session_id)` mantiene historiales separados en un diccionario
-de `InMemoryChatMessageHistory`. Ese almacenamiento vive solo mientras el
-proceso se ejecuta: no persiste al reiniciar. `cerrar_sesion(session_id)` libera
-el historial de una conversación terminada y se puede llamar más de una vez.
-Usa el mismo `session_id` para continuar una conversación y otro identificador
-para una conversación independiente.
+El `session_id` se usa como `thread_id` del checkpoint. `obtener_historial`
+devuelve la lista de mensajes guardados para esa sesión. `InMemorySaver` vive
+solo mientras el proceso se ejecuta y no persiste al reiniciar.
+`cerrar_sesion(session_id)` elimina el grafo y su checkpoint en memoria; se
+puede llamar más de una vez. Usa el mismo `session_id` para continuar una
+conversación y otro identificador para una conversación independiente.
 
 Antes de guardar el turno en la memoria, `construir_agente_con_memoria` adapta
 la salida del ejecutor: conserva las cadenas y concatena los bloques
@@ -62,11 +63,8 @@ La memoria conserva contexto conversacional; no sustituye los datos reales del
 sistema. Cada turno vuelve a enviar el historial al modelo, por lo que las
 conversaciones largas pueden aumentar latencia y costo.
 
-En la versión de LangChain instalada, `RunnableWithMessageHistory` y
-`InMemoryChatMessageHistory` emiten avisos de obsolescencia que recomiendan la
-persistencia de LangGraph para código nuevo. Este bloque mantiene esas clases
-porque enseña cómo envolver el `AgentExecutor` existente sin migrar la
-arquitectura; el aviso no impide que la memoria funcione.
+La implementación usa el checkpoint de LangGraph directamente y evita las
+clases de memoria de LangChain que estaban obsoletas.
 
 ## Ejecutar y probar
 
@@ -119,9 +117,5 @@ aumente después de cada turno y que una sesión nueva empiece vacía.
 - **Las sesiones parecen compartir contexto:** usa un `session_id` distinto por
   conversación y no reutilices identificadores entre usuarios.
 - **El historial vuelve a cero después de reiniciar:** es el comportamiento
-  esperado de `InMemoryChatMessageHistory`; para persistencia, reemplaza el
-  proveedor de historial por un almacenamiento duradero.
-- **Aparece `LangChainDeprecationWarning`:** la API del ejemplo sigue
-  funcionando, pero LangChain recomienda LangGraph para implementaciones
-  nuevas que necesiten persistencia. Es un aviso de migración, no el error que
-  impedía iniciar el segundo turno.
+  esperado de `InMemorySaver`; para persistencia entre reinicios, configura un
+  checkpointer duradero de LangGraph.

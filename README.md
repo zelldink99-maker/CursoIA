@@ -378,12 +378,11 @@ python -m pytest tests/test_agente_con_herramientas.py -q
 
 El agente también valida los argumentos del cálculo de tokens mediante un
 `args_schema` de Pydantic 2, con descripciones por campo y el nombre explícito
-`calcular_costo_tokens_gemini`. `RunnableWithMessageHistory` conserva contexto
-entre turnos y separa conversaciones por `session_id`. Los historiales se
-mantienen en memoria durante el proceso y no persisten al reiniciarlo;
-`cerrar_sesion(session_id)` elimina una conversación.
-La versión actual de LangChain puede mostrar avisos de obsolescencia para esta
-API de memoria; la guía explica ese alcance.
+`calcular_costo_tokens_gemini`. Un grafo de LangGraph con `InMemorySaver`
+conserva contexto entre turnos y separa conversaciones por `session_id`,
+traducido a `thread_id` para el checkpoint. Los historiales se mantienen en
+memoria durante el proceso y no persisten al reiniciarlo;
+`cerrar_sesion(session_id)` elimina el checkpoint de esa conversación.
 
 El ejemplo ejecutable hace dos turnos en una sesión compartida, por lo que
 requiere `GEMINI_API_KEY` y puede generar costos. Las pruebas del comando
@@ -488,24 +487,31 @@ consulta el índice real con embeddings de Gemini y agrega cada corrida a
 individuales:
 
 ```console
+python -m src.GATE_2.evaluar_recuperacion --k 1
+python -m src.GATE_2.evaluar_recuperacion --k 2
 python -m src.GATE_2.evaluar_recuperacion --k 3
 python -m pytest tests/test_evaluacion_recuperacion.py -q
 ```
 
+La medición actual del corpus (10 preguntas) favorece `k=1`; ese es también
+el valor por defecto del servicio. Compara los valores explícitos cuando cambie
+el corpus o sus etiquetas.
+
 `src/GATE_2/registro_rag.py` mide embedding+búsqueda y generación, y guarda los
-tokens reales de `usage_metadata`, que permiten estimar el costo según las
-tarifas vigentes del modelo. Cada consulta agrega una línea a
+tokens reales de `usage_metadata` junto con el costo estimado en USD según las
+tarifas configuradas. También devuelve la respuesta citada y las fuentes a la
+consola, pero no las persiste en el registro. Cada consulta agrega una línea a
 `registros_latencia_costo.jsonl`:
 
 ```console
-python -m src.GATE_2.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
+python -m src.GATE_2.registro_rag --pregunta "¿Qué errores reintenta el cliente?"
 python -m src.GATE_2.registro_rag --actividad-core
 python -m pytest tests/test_registro_rag.py -q
 python -m src.GATE_2.preflight_rag
 ```
 
 `--actividad-core` imprime en consola las tres consultas, la comparación de
-`input_tokens` para `k=3` y `k=6`, y el total de líneas guardadas. Ejecuta cinco
+`input_tokens` para `k=1` y `k=2`, y el total de líneas guardadas. Ejecuta cinco
 consultas reales y puede consumir cuota.
 
 Ambos archivos de resultados quedan excluidos de Git. Las evaluaciones y el
@@ -514,6 +520,42 @@ pruebas enfocadas usan datos simulados sin red. Consulta las guías de
 [evaluación de recuperación](docs/bloque-27-evaluacion-recuperacion.md) y
 [latencia y costo RAG](docs/bloque-28-latencia-costo-rag.md) para etiquetas,
 interpretación de resultados, comparación de `k` y solución de problemas.
+
+## Gate 2: autochequeo integrado y rúbrica
+
+El autochequeo de la raíz conecta el indexador Chroma, el servicio de
+recuperación/citación, el registro de trazas y el grafo real de LangGraph. Las
+cuatro pruebas usan embeddings y generación simulados, un índice temporal y no
+requieren red ni credenciales:
+
+```console
+python -m pytest test_gate2.py -v
+```
+
+La respuesta usa citas numeradas (`[1]`) y el mapa `fuentes` asocia cada número
+con el archivo recuperado. El registro JSONL contiene solo la longitud de la
+pregunta, conteos, tiempos, tokens, costo estimado y `trace_id`; no persiste la
+pregunta, la respuesta ni el contenido de documentos. Para comprobar la
+integración con Gemini real, ejecuta una consulta individual:
+
+```console
+python -m src.GATE_2.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
+```
+
+Esta llamada usa Gemini para el embedding y la generación, puede consumir cuota
+y agrega un registro local. Si no hay clave válida, deja la comprobación real
+como pendiente; no reemplaces tokens o costos ausentes con valores simulados.
+
+La función `rubrica_gate2.py` valida los seis puntajes, calcula el promedio
+ponderado y fuerza los cuatro criterios no compensables:
+
+```console
+python rubrica_gate2.py
+```
+
+Antes de entregar, sigue el [checklist verificable del Gate 2](docs/checklist_gate2.md).
+Incluye el estado de las pruebas locales, las evidencias del corpus propio y
+las comprobaciones que requieren la clave de API o una entrega Git.
 
 ### Personalización y dataset de tuning (Bloque 29)
 
@@ -545,7 +587,9 @@ de ejemplo completa y guardarla en `docs/decision_personalizacion.md`, ejecuta:
 python -m src.GATE_2.decision_personalizacion
 ```
 
-El ejemplo no usa la API y el comando no sobrescribe un documento existente.
+La decisión documentada en este repositorio aplica el método al servicio RAG
+propio: información cambiante, citas obligatorias y ausencia de un dataset de
+entrenamiento grande favorecen RAG. El ejemplo de código no usa la API.
 Ejecuta las pruebas locales sin credenciales ni llamadas de red:
 
 ```console
@@ -645,7 +689,8 @@ la respuesta es consistente entre varios intentos.
 
 - [docs/decision-arquitectura.md](docs/decision-arquitectura.md): decisiones de modelo, arquitectura y cálculo de costos.
 - [docs/limites_metrica.md](docs/limites_metrica.md): límites conocidos de precisión, cobertura y F1, rúbrica y recomendación de revisión manual.
-- [docs/decision_personalizacion.md](docs/decision_personalizacion.md): ejemplo documentado de la decisión de personalización del Bloque 30.
+- [docs/decision_personalizacion.md](docs/decision_personalizacion.md): decisión de personalización aplicada al servicio RAG del proyecto.
+- [docs/checklist_gate2.md](docs/checklist_gate2.md): checklist de evidencias, criterios no compensables y pendientes de entrega.
 - [docs/registro_resultados.txt](docs/registro_resultados.txt): registro de resultados de pruebas y evaluaciones del proyecto.
 
 ## Notas importantes

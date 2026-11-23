@@ -66,8 +66,9 @@ observabilidad del proyecto.
 
 El registro `src/GATE_2/registro_rag.py` asigna un `trace_id` nuevo por consulta
 y emite eventos `consulta_recibida`, `documento_descartado_por_inyeccion`,
-`contexto_filtrado` y `consumo_llm`. También conserva duración por etapa y los
-tokens informados por el modelo:
+`contexto_filtrado` y `consumo_llm`. También conserva duración por etapa, los
+tokens informados por el modelo y el costo estimado en USD cuando existen
+metadatos completos:
 
 ```console
 python -m src.GATE_2.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
@@ -79,7 +80,9 @@ dos consultas independientes, el descarte de un documento con patrones
 sospechosos y el estado de `trace_id` fuera de cualquier consulta.
 
 Cada línea de `registros_latencia_costo.jsonl` incluye longitudes, conteos,
-tiempos y uso de tokens, pero omite el texto de la pregunta y del contexto.
+tiempos, uso y costo estimado por tokens, pero omite la pregunta, la respuesta
+y el contexto en texto crudo. Si faltan metadatos, tokens y costo quedan en
+`null`.
 Las consultas reales requieren credenciales y pueden consumir cuota. Las
 pruebas enfocadas son locales y no llaman a Gemini:
 
@@ -129,7 +132,8 @@ protege el archivo en disco.
 `puntuar_riesgo(probabilidad, impacto)` acepta enteros de 1 a 5 y calcula su
 producto. Los niveles son: bajo (<4), medio (4-8), alto (9-14) y crítico (15+).
 `ordenar_riesgos` presenta primero los puntajes mayores. Todo riesgo alto o
-crítico marca `requiere_supervision_humana=True`.
+crítico marca `requiere_supervision_humana=True` y especifica su acción de
+revisión en `punto_supervision`.
 
 ```console
 python -m src.GATE_2.supervision_riesgos

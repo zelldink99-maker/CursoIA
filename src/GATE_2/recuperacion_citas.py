@@ -120,7 +120,7 @@ def responder_con_citas(
     vectorstore: Chroma,
     modelo: BaseChatModel,
     *,
-    cantidad_resultados: int = 3,
+    cantidad_resultados: int = 1,
     callbacks: list[BaseCallbackHandler] | None = None,
 ) -> tuple[str, dict[int, str]]:
     """Recupera documentos, consulta el modelo y retorna respuesta y fuentes."""

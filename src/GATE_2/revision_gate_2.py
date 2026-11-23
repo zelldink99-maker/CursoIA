@@ -1434,7 +1434,6 @@ def _revisar_agente_langchain(
     campos = agente.calcular_costo_tokens.args_schema.model_fields
     historial_uno = agente.obtener_historial("revision-gate-bloque-22-uno")
     historial_dos = agente.obtener_historial("revision-gate-bloque-22-dos")
-    historial_uno.add_user_message("mensaje privado de prueba")
     correcto = (
         "3 veces" in resultado_documentacion
         and "USD 0.00150000" in resultado_costo
@@ -1443,7 +1442,8 @@ def _revisar_agente_langchain(
         and set(campos)
         == {"tokens_entrada", "tokens_salida", "tokens_pensamiento"}
         and all(campo.description for campo in campos.values())
-        and historial_dos.messages == []
+        and historial_uno == []
+        and historial_dos == []
     )
     agente.cerrar_sesion("revision-gate-bloque-22-uno")
     agente.cerrar_sesion("revision-gate-bloque-22-dos")

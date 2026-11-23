@@ -25,7 +25,12 @@ if __package__:
         crear_embeddings,
         validar_fuentes_actuales,
     )
-    from .recuperacion_citas import construir_prompt, formatear_contexto
+    from .recuperacion_citas import (
+        construir_prompt,
+        formatear_contexto,
+        validar_citas,
+    )
+    from .costo import calcular_costo
     from .seguridad_rag import filtrar_documentos_sospechosos
 else:
     if str(PROJECT_ROOT) not in sys.path:
@@ -40,7 +45,9 @@ else:
     from src.GATE_2.recuperacion_citas import (
         construir_prompt,
         formatear_contexto,
+        validar_citas,
     )
+    from src.GATE_2.costo import calcular_costo
     from src.GATE_2.seguridad_rag import filtrar_documentos_sospechosos
 
 if TYPE_CHECKING:
@@ -67,16 +74,16 @@ def medir(tiempos: dict[str, float], etapa: str) -> Generator[None, None, None]:
     tiempos[etapa] = time.perf_counter() - inicio
 
 
-def registrar_consulta(
+def _ejecutar_consulta(
     pregunta: str,
     persist_directory: str | Path = RUTA_VECTORSTORE,
-    k: int = 3,
+    k: int = 1,
     *,
     embeddings: Embeddings | None = None,
     vectorstore: Chroma | None = None,
     chat_model: BaseChatModel | None = None,
-) -> dict[str, Any]:
-    """Ejecuta una consulta RAG y devuelve tiempos y tokens reales."""
+) -> tuple[str, dict[int, str], dict[str, Any]]:
+    """Ejecuta el flujo RAG y separa la respuesta del registro sin contenido."""
     if not isinstance(pregunta, str) or not pregunta.strip():
         raise ValueError("La pregunta debe ser un texto no vacío.")
     if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
@@ -148,13 +155,55 @@ def registrar_consulta(
         n_limpios=len(documentos_limpios),
         n_descartados=len(documentos_descartados),
     )
-    contexto, _ = formatear_contexto(documentos_limpios)
+    contexto, fuentes = formatear_contexto(documentos_limpios)
     prompt = construir_prompt(pregunta, contexto)
     with medir(tiempos, "generacion"):
-        respuesta = modelo_activo.invoke(prompt)
+        mensaje = modelo_activo.invoke(prompt)
 
-    usage_metadata = respuesta.usage_metadata
+    contenido = mensaje.content
+    if isinstance(contenido, str):
+        respuesta = contenido
+    elif isinstance(contenido, list):
+        partes = [
+            bloque["text"]
+            for bloque in contenido
+            if isinstance(bloque, dict)
+            and bloque.get("type") == "text"
+            and isinstance(bloque.get("text"), str)
+        ]
+        respuesta = "".join(partes)
+    else:
+        raise TypeError("El modelo devolvió una respuesta sin texto compatible.")
+    if not respuesta.strip():
+        raise ValueError("El modelo devolvió una respuesta vacía.")
+    respuesta = respuesta.strip()
+    validar_citas(respuesta, fuentes)
+
+    usage_metadata = mensaje.usage_metadata
     tokens = dict(usage_metadata) if usage_metadata else None
+    costo_estimado_usd = None
+    if tokens is not None:
+        tokens_entrada = tokens.get("input_tokens")
+        tokens_salida = tokens.get("output_tokens")
+        if tokens_entrada is None or tokens_salida is None:
+            raise ValueError(
+                "El modelo devolvió metadatos de uso incompletos; "
+                "no se puede estimar el costo."
+            )
+        metadatos_costo = {
+            "promptTokenCount": tokens_entrada,
+            "candidatesTokenCount": tokens_salida,
+            "totalTokenCount": tokens.get(
+                "total_tokens",
+                tokens_entrada + tokens_salida,
+            ),
+        }
+        tokens_pensamiento = tokens.get("thoughts_tokens")
+        if tokens_pensamiento is not None:
+            metadatos_costo["thoughtsTokenCount"] = tokens_pensamiento
+        costo_estimado_usd = calcular_costo(
+            {"usageMetadata": metadatos_costo}
+        )
     registrar_evento(
         "consumo_llm",
         "INFO",
@@ -162,6 +211,7 @@ def registrar_consulta(
         input_tokens=tokens.get("input_tokens") if tokens else None,
         output_tokens=tokens.get("output_tokens") if tokens else None,
         total_tokens=tokens.get("total_tokens") if tokens else None,
+        costo_estimado_usd=costo_estimado_usd,
     )
     registro = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -174,10 +224,52 @@ def registrar_consulta(
         },
         "tiempo_total_ms": round(sum(tiempos.values()) * 1000, 2),
         "tokens": tokens,
+        "costo_estimado_usd": costo_estimado_usd,
         "n_limpios": len(documentos_limpios),
         "n_descartados": len(documentos_descartados),
         "eventos": eventos,
     }
+    return respuesta, fuentes, registro
+
+
+def ejecutar_consulta(
+    pregunta: str,
+    persist_directory: str | Path = RUTA_VECTORSTORE,
+    k: int = 1,
+    *,
+    embeddings: Embeddings | None = None,
+    vectorstore: Chroma | None = None,
+    chat_model: BaseChatModel | None = None,
+) -> tuple[str, dict[int, str], dict[str, Any]]:
+    """Devuelve la respuesta citada, las fuentes y un registro sin texto crudo."""
+    return _ejecutar_consulta(
+        pregunta,
+        persist_directory,
+        k,
+        embeddings=embeddings,
+        vectorstore=vectorstore,
+        chat_model=chat_model,
+    )
+
+
+def registrar_consulta(
+    pregunta: str,
+    persist_directory: str | Path = RUTA_VECTORSTORE,
+    k: int = 1,
+    *,
+    embeddings: Embeddings | None = None,
+    vectorstore: Chroma | None = None,
+    chat_model: BaseChatModel | None = None,
+) -> dict[str, Any]:
+    """Ejecuta una consulta y devuelve solo su registro, sin respuesta cruda."""
+    _, _, registro = _ejecutar_consulta(
+        pregunta,
+        persist_directory,
+        k,
+        embeddings=embeddings,
+        vectorstore=vectorstore,
+        chat_model=chat_model,
+    )
     return registro
 
 
@@ -343,7 +435,7 @@ def imprimir_demo_trazas() -> None:
 
 
 def ejecutar_actividad_core(
-    k: int = 3,
+    k: int = 1,
     ruta_registro: str | Path = RUTA_REGISTRO,
 ) -> list[dict[str, Any]]:
     """Ejecuta los cinco registros de la actividad core y muestra su resumen."""
@@ -423,7 +515,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="append",
         help="Pregunta a consultar; puede repetirse.",
     )
-    parser.add_argument("--k", type=int, default=3, help="Cantidad de chunks")
+    parser.add_argument("--k", type=int, default=1, help="Cantidad de chunks")
     parser.add_argument(
         "--demo-trazas",
         action="store_true",
@@ -452,14 +544,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     registros_consultados = []
     for numero, pregunta in enumerate(preguntas, start=1):
-        registro = registrar_consulta(
+        respuesta, fuentes, registro = ejecutar_consulta(
             pregunta,
             persist_directory=RUTA_VECTORSTORE,
             k=argumentos.k,
         )
         registros_consultados.append(registro)
         imprimir_consulta_trazada(registro, numero)
+        print(f"respuesta final: {respuesta}")
+        print(f"fuentes citadas: {json.dumps(fuentes, ensure_ascii=False)}")
         guardar_registro(registro)
+        if registro["costo_estimado_usd"] is not None:
+            print(
+                "costo estimado de la consulta: "
+                f"USD {registro['costo_estimado_usd']:.8f}"
+            )
     if len(registros_consultados) >= 2:
         print("\ntrace_id fuera de cualquier consulta: None")
     print(f"Registros agregados en {RUTA_REGISTRO}")
