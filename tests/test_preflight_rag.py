@@ -13,6 +13,7 @@ from src.GATE_2 import preflight_rag
 def test_preflight_confirma_indice_y_gitignore(tmp_path: Path) -> None:
     vectorstore = tmp_path / "vectorstore"
     vectorstore.mkdir()
+    (vectorstore / "chroma.sqlite3").write_bytes(b"index")
     gitignore = tmp_path / ".gitignore"
     gitignore.write_text("vectorstore/\n", encoding="utf-8")
 
@@ -36,6 +37,7 @@ def test_preflight_informa_indice_y_gitignore_ausentes(
 def test_preflight_detecta_indice_no_ignorado(tmp_path: Path) -> None:
     vectorstore = tmp_path / "vectorstore"
     vectorstore.mkdir()
+    (vectorstore / "chroma.sqlite3").write_bytes(b"index")
     gitignore = tmp_path / ".gitignore"
     gitignore.write_text(".env\n", encoding="utf-8")
 
@@ -44,6 +46,17 @@ def test_preflight_detecta_indice_no_ignorado(tmp_path: Path) -> None:
     ]
 
 
+def test_preflight_detecta_indice_vacio(tmp_path: Path) -> None:
+    vectorstore = tmp_path / "vectorstore"
+    vectorstore.mkdir()
+    gitignore = tmp_path / ".gitignore"
+    gitignore.write_text("vectorstore/\n", encoding="utf-8")
+
+    assert preflight_rag.preflight_check(vectorstore, gitignore) == [
+        "vectorstore/ existe pero esta vacio."
+    ]
+
+
 def test_main_imprime_estado_real_del_proyecto(capsys) -> None:
     assert preflight_rag.main() == 0
-    assert "Preflight OK" in capsys.readouterr().out
+    assert "no esta vacia" in capsys.readouterr().out

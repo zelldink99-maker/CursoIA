@@ -30,11 +30,16 @@ con esta forma:
 
 ## Muestra revisada
 
-La revisión del proyecto todavía no se ha ejecutado. Completa estos datos
-después de revisar manualmente el JSON; no los presentes como hallazgos antes
-de hacerlo:
+La revisión del proyecto todavía no se ha ejecutado. El archivo de actividad
+core contiene una respuesta de las 20 requeridas; el intento se interrumpió por
+timeouts del proveedor al generar la siguiente. `resultados_metricas.json`
+conserva aparte tres resultados heredados, pero sus consultas no corresponden
+al lote actual salvo la primera; no se combinan automáticamente. Completa estos
+datos después de generar el lote y revisar manualmente el JSON; no los presentes
+como hallazgos antes de hacerlo:
 
-- Respuestas generadas: PENDIENTE
+- Respuestas en `resultados_actividad_core.json`: 1 de 20 (faltan 19)
+- Resultados heredados conservados en `resultados_metricas.json`: 3
 - Casos revisados: PENDIENTE
 - Fecha de revisión: PENDIENTE
 - Criterio de selección: PENDIENTE (incluye los cinco F1 más bajos y los cinco más altos).

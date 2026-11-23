@@ -45,9 +45,11 @@ La matriz contiene cinco riesgos concretos y los ordena por probabilidad por
 impacto, de mayor a menor. Los niveles son `CRITICO`, `ALTO`, `MEDIO` y `BAJO`.
 Cada fila incluida en los límites de categoría se marca con `[AL LIMITE]`.
 
-Todo riesgo alto o crítico necesita una acción de revisión humana asociada.
-Los puntajes son un ejemplo de estimación; deben ajustarse con evidencia real
-del proyecto.
+Todo riesgo alto o crítico muestra su punto de revisión humana: aprobación
+antes de reindexar un documento puesto en cuarentena, revisión de privacidad
+antes de exportar registros y aprobación de métricas antes del despliegue. Los
+puntajes son un ejemplo de estimación; deben ajustarse con evidencia real del
+proyecto.
 
 ## Dependencia y pruebas
 

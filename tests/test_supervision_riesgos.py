@@ -74,6 +74,11 @@ def test_matriz_puntua_y_ordena_riesgos_y_exige_revision_humana() -> None:
         for riesgo in riesgos
         if riesgo.nivel in {"ALTO", "CRÍTICO"}
     )
+    assert all(
+        riesgo.riesgo.punto_supervision.strip()
+        for riesgo in riesgos
+        if riesgo.nivel in {"ALTO", "CRÍTICO"}
+    )
     assert not riesgos[-1].requiere_supervision_humana
 
 

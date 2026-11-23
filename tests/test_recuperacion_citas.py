@@ -155,7 +155,7 @@ def test_responder_busca_contexto_invoca_modelo_y_devuelve_citas() -> None:
     assert fuentes == {1: "src/GATE_2/cliente.py"}
     vectorstore.similarity_search.assert_called_once_with(
         "¿Cuántas veces reintenta?",
-        k=3,
+        k=1,
     )
     assert "[1] Fuente: src/GATE_2/cliente.py" in modelo.prompts[0]
 

@@ -2,6 +2,72 @@
 
 Los cambios importantes del proyecto se documentan en este archivo.
 
+## Updates - 2026-11-23 — Integración final de Gate 2
+
+Responsable: Igor Inostroza
+
+### Añadido
+
+- `test_gate2.py`: autochequeo integrado de pipeline, citas, privacidad de
+  registros y pausa/reanudación de supervisión humana.
+- `rubrica_gate2.py` y `tests/test_rubrica_gate2.py`: cálculo ponderado con
+  validación de puntajes y criterios no compensables; la prueba también puede
+  ejecutarse directamente con Python.
+- `docs/checklist_gate2.md`: evidencia de las seis dimensiones, criterios
+  obligatorios, corrida real y pendientes de entrega.
+
+### Cambiado
+
+- `src/GATE_2/registro_rag.py`: integra respuesta citada, fuentes, `trace_id`,
+  latencias, tokens y costo estimado por consulta; los registros no guardan
+  pregunta, respuesta ni documentos en texto crudo.
+- `src/GATE_2/preflight_rag.py`: además de comprobar `.gitignore`, detecta
+  directorios de índice vacíos.
+- `src/GATE_2/supervision_riesgos.py`: asigna un punto concreto de supervisión
+  humana a cada riesgo de nivel alto o crítico.
+- `docs/decision_personalizacion.md`: aplica la comparación RAG, fine-tuning y
+  PEFT al corpus y al servicio de este repositorio.
+- README y guías de los Bloques 28, 31 y 32: documentan el costo registrado,
+  privacidad, supervisión y checklist de entrega.
+- Servicio de recuperación: se fijó `k=1` como valor por defecto tras evaluar
+  diez preguntas del corpus; quedaron documentadas las métricas comparativas
+  para `k=1`, `k=2` y `k=3`.
+- Bloque 28: se documentó un objetivo operativo acordado de 30 s máximo por
+  consulta; la medición real de 261.4 s aún no lo cumple.
+- Bloque 22: se migró la memoria de conversación desde las clases obsoletas de
+  LangChain a un `StateGraph` con `InMemorySaver`.
+- `requirements.txt`: se actualizó el conector Gemini para usar el SDK 3.x
+  compatible y una versión de `langchain-core` que satisface su requisito.
+- `.gitignore`: excluye `.env` y variantes, conservando `.env.example`.
+- `.gitignore`: excluye también el lote local `resultados_actividad_core.json`.
+- `.env.example`: aclara que la clave configurada es de Gemini.
+
+### Validación
+
+- Suite completa: 195 pruebas pasaron; tras la migración de memoria y la
+  actualización del SDK, queda un aviso upstream de Chroma por
+  `asyncio.iscoroutinefunction` en Python 3.14.
+- `compileall` compiló el código Python del proyecto y las entradas de Gate 2.
+- `pip check` no encontró dependencias rotas y todos los requisitos declarados
+  están instalados en rango.
+- Preflight confirmó el índice persistido y la exclusión de secretos.
+- Una consulta real completó con fuentes y sin persistir la pregunta cruda;
+  registró 720 tokens y un costo estimado de USD 0.001878. La latencia total
+  medida fue 261,407.46 ms.
+- `revision_gate_2.py --omitir-api` confirmó el código y las dependencias, pero
+  mantiene pendiente la actividad core del Bloque 17: hay 1 respuesta de 20
+  en el archivo del lote actual y faltan las revisiones manuales requeridas.
+- `requirements.txt` actualizado a `google-genai` 3.x, `langchain-google-genai`
+  4.5.2 y `langchain-core` 1.8.4; `pip check` no detectó conflictos.
+- Evaluación de recuperación del 23 de noviembre (10 preguntas): `k=1`
+  precisión/recall/F1 **1.000/1.000/1.000**; `k=2` **0.500/1.000/0.667**.
+- La regeneración de las respuestas del Bloque 17 guardó una respuesta antes de
+  que la siguiente agotara tres reintentos de timeout; no se inventaron las
+  respuestas restantes ni revisiones. La consulta RAG con
+  `thinking_budget=0` también falló (504 con `gemini-3.5-flash`; 503 de alta
+  demanda con `gemini-3.8-flash`). Una consulta adicional con el SDK actualizado
+  agotó un timeout de 25 s; no se inventaron resultados ni revisiones.
+
 ## [No publicado] - 2026-11-19
 
 ### Añadido

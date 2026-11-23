@@ -150,6 +150,7 @@ class Riesgo:
     descripcion: str
     probabilidad: int
     impacto: int
+    punto_supervision: str
 
 
 @dataclass(frozen=True)
@@ -168,11 +169,41 @@ class RiesgoPuntuado(PuntuacionRiesgo):
 
 
 RIESGOS_EJEMPLO = (
-    Riesgo(1, "Inyección de prompt vía documento recuperado", 4, 4),
-    Riesgo(2, "Filtración de PII en logs sin redactar", 5, 3),
-    Riesgo(3, "Dataset de tuning desbalanceado produce sesgo", 3, 3),
-    Riesgo(4, "Modelo de embeddings deprecado sin aviso", 2, 4),
-    Riesgo(5, "Chunk no reindexado devuelve información vieja", 3, 2),
+    Riesgo(
+        1,
+        "Inyección de prompt vía documento recuperado",
+        4,
+        4,
+        "Cuarentena del documento y aprobación humana antes de reindexarlo.",
+    ),
+    Riesgo(
+        2,
+        "Filtración de PII en logs sin redactar",
+        5,
+        3,
+        "Revisión humana de privacidad antes de exportar o compartir registros.",
+    ),
+    Riesgo(
+        3,
+        "Dataset de tuning desbalanceado produce sesgo",
+        3,
+        3,
+        "Aprobación humana de métricas de equidad antes de desplegar el modelo.",
+    ),
+    Riesgo(
+        4,
+        "Modelo de embeddings deprecado sin aviso",
+        2,
+        4,
+        "Revisión humana de compatibilidad antes de cambiar el modelo de embeddings.",
+    ),
+    Riesgo(
+        5,
+        "Chunk no reindexado devuelve información vieja",
+        3,
+        2,
+        "Revisión humana de la fuente y el índice tras una actualización fallida.",
+    ),
 )
 
 
@@ -246,6 +277,11 @@ def main() -> int:
             f"{nivel:8} ({resultado.puntaje:2}) - "
             f"{resultado.riesgo.descripcion}"
         )
+        if resultado.requiere_supervision_humana:
+            print(
+                f"  Supervisión humana: "
+                f"{resultado.riesgo.punto_supervision}"
+            )
         if esta_en_el_limite(
             resultado.riesgo.probabilidad,
             resultado.riesgo.impacto,

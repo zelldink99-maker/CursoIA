@@ -208,7 +208,7 @@ def test_memoria_conserva_contexto_entre_turnos_de_la_misma_sesion() -> None:
     assert "El primer costo fue USD 0.0015." in [
         mensaje.content for mensaje in modelo.mensajes_recibidos[1]
     ]
-    assert len(obtener_historial("prueba-memoria-misma").messages) == 4
+    assert len(obtener_historial("prueba-memoria-misma")) == 4
     assert resultado["output"] == "Conservo el contexto de la pregunta anterior."
     cerrar_sesion("prueba-memoria-misma")
 
@@ -244,7 +244,7 @@ def test_memoria_normaliza_bloques_de_texto_del_modelo_entre_turnos() -> None:
     assert segunda_respuesta["output"] == "Conservo la respuesta anterior."
     assert all(
         isinstance(mensaje.content, str)
-        for mensaje in obtener_historial("prueba-memoria-bloques").messages
+        for mensaje in obtener_historial("prueba-memoria-bloques")
     )
     cerrar_sesion("prueba-memoria-bloques")
 
@@ -266,12 +266,12 @@ def test_memoria_aisla_sesiones_y_permite_cerrar_sesion() -> None:
     assert "Dato privado de la sesión uno." not in [
         mensaje.content for mensaje in modelo.mensajes_recibidos[1]
     ]
-    assert len(obtener_historial("prueba-aislamiento-uno").messages) == 2
-    assert len(obtener_historial("prueba-aislamiento-dos").messages) == 2
+    assert len(obtener_historial("prueba-aislamiento-uno")) == 2
+    assert len(obtener_historial("prueba-aislamiento-dos")) == 2
     assert resultado["output"] == "No hay contexto previo en esta sesión."
 
     cerrar_sesion("prueba-aislamiento-uno")
     cerrar_sesion("prueba-aislamiento-dos")
     cerrar_sesion("sesion-inexistente")
-    assert obtener_historial("prueba-aislamiento-uno").messages == []
+    assert obtener_historial("prueba-aislamiento-uno") == []
     cerrar_sesion("prueba-aislamiento-uno")

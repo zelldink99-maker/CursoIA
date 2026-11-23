@@ -5,18 +5,19 @@ from __future__ import annotations
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, TypedDict
 
-from langchain_core.chat_history import (
-    BaseChatMessageHistory,
-    InMemoryChatMessageHistory,
-)
+from langchain_core.agents import AgentAction
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import Runnable
+from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
 from langchain_core.tools import BaseTool, tool
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
 
 if __package__:
@@ -158,19 +159,36 @@ def construir_ejecutor_agente(
     )
 
 
-historiales: dict[str, InMemoryChatMessageHistory] = {}
+class EstadoConversacion(TypedDict, total=False):
+    messages: Annotated[list[BaseMessage], add_messages]
+    output: str
+    intermediate_steps: list[tuple[AgentAction, str]]
 
 
-def obtener_historial(session_id: str) -> BaseChatMessageHistory:
-    """Devuelve el historial en memoria asociado a una sesión."""
-    if session_id not in historiales:
-        historiales[session_id] = InMemoryChatMessageHistory()
-    return historiales[session_id]
+AplicacionConversacion = CompiledStateGraph[
+    EstadoConversacion,
+    None,
+    EstadoConversacion,
+    EstadoConversacion,
+]
+
+aplicaciones_por_sesion: dict[str, AplicacionConversacion] = {}
+
+
+def obtener_historial(session_id: str) -> list[BaseMessage]:
+    """Devuelve los mensajes del estado persistido en memoria de LangGraph."""
+    aplicacion = aplicaciones_por_sesion.get(session_id)
+    if aplicacion is None:
+        return []
+    estado = aplicacion.get_state(
+        {"configurable": {"thread_id": session_id}}
+    )
+    return list(estado.values.get("messages", []))
 
 
 def cerrar_sesion(session_id: str) -> None:
-    """Elimina el historial en memoria de una sesión, si existe."""
-    historiales.pop(session_id, None)
+    """Elimina el grafo y su checkpoint en memoria asociado a la sesión."""
+    aplicaciones_por_sesion.pop(session_id, None)
 
 
 def _normalizar_respuesta_agente(
@@ -204,17 +222,71 @@ def _normalizar_respuesta_agente(
 
 def construir_agente_con_memoria(
     ejecutor: AgentExecutor,
-) -> RunnableWithMessageHistory:
-    """Envuelve el ejecutor para conservar mensajes separados por session_id."""
+) -> Runnable[dict[str, Any], dict[str, Any]]:
+    """Conserva mensajes por sesión usando el checkpoint en memoria de LangGraph."""
     ejecutor_con_salida_texto: Runnable[dict[str, Any], dict[str, Any]] = (
         ejecutor | _normalizar_respuesta_agente
     )
-    return RunnableWithMessageHistory(
-        ejecutor_con_salida_texto,
-        obtener_historial,
-        input_messages_key="entrada",
-        history_messages_key="chat_history",
-    )
+
+    def responder(estado: EstadoConversacion) -> dict[str, Any]:
+        mensajes = estado.get("messages", [])
+        if not mensajes or not isinstance(mensajes[-1], HumanMessage):
+            raise ValueError("El estado debe terminar con un mensaje del usuario.")
+        entrada = mensajes[-1].content
+        if not isinstance(entrada, str):
+            raise TypeError("El mensaje del usuario debe contener texto.")
+        resultado = ejecutor_con_salida_texto.invoke(
+            {
+                "entrada": entrada,
+                "chat_history": mensajes[:-1],
+            }
+        )
+        salida = resultado.get("output")
+        if not isinstance(salida, str):
+            raise TypeError("La salida del agente debe ser texto.")
+        return {
+            "messages": [AIMessage(content=salida)],
+            "output": salida,
+            "intermediate_steps": resultado.get("intermediate_steps", []),
+        }
+
+    grafo = StateGraph(EstadoConversacion)
+    grafo.add_node("responder", responder)
+    grafo.add_edge(START, "responder")
+    grafo.add_edge("responder", END)
+    aplicacion = grafo.compile(checkpointer=InMemorySaver())
+
+    def ejecutar(
+        entrada: dict[str, Any],
+        config: RunnableConfig | None = None,
+    ) -> dict[str, Any]:
+        configurable = config.get("configurable", {}) if config else {}
+        if not isinstance(configurable, Mapping):
+            raise TypeError("La configuración del agente debe ser un mapa.")
+        session_id = configurable.get("session_id")
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise ValueError("La configuración requiere un session_id no vacío.")
+        contenido = entrada.get("entrada")
+        if not isinstance(contenido, str) or not contenido.strip():
+            raise ValueError("La entrada del agente debe ser un texto no vacío.")
+
+        aplicacion_sesion = aplicaciones_por_sesion.get(session_id)
+        if aplicacion_sesion is None:
+            aplicaciones_por_sesion[session_id] = aplicacion
+            aplicacion_sesion = aplicacion
+        estado = aplicacion_sesion.invoke(
+            {"messages": [HumanMessage(content=contenido)]},
+            {"configurable": {"thread_id": session_id}},
+        )
+        salida = estado.get("output")
+        if not isinstance(salida, str):
+            raise TypeError("El estado del agente no contiene una salida de texto.")
+        return {
+            "output": salida,
+            "intermediate_steps": estado.get("intermediate_steps", []),
+        }
+
+    return RunnableLambda(ejecutar)
 
 
 def main() -> int:

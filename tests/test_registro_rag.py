@@ -60,6 +60,7 @@ def test_main_normal_imprime_pasos_y_eventos_reales(
             "trace_id": "trace-real-1",
             "n_limpios": 1,
             "n_descartados": 1,
+            "costo_estimado_usd": None,
             "eventos": [
                 {
                     "level": "INFO",
@@ -77,6 +78,7 @@ def test_main_normal_imprime_pasos_y_eventos_reales(
             "trace_id": "trace-real-2",
             "n_limpios": 1,
             "n_descartados": 0,
+            "costo_estimado_usd": None,
             "eventos": [
                 {
                     "level": "INFO",
@@ -87,10 +89,19 @@ def test_main_normal_imprime_pasos_y_eventos_reales(
         },
     ]
     llamadas = iter(registros)
+    valores_k: list[object] = []
+
+    def ejecutar_consulta(
+        *args: object,
+        **kwargs: object,
+    ) -> tuple[str, dict[int, str], dict[str, object]]:
+        valores_k.append(kwargs["k"])
+        return "Respuesta [1].", {1: "fuente.md"}, next(llamadas)
+
     monkeypatch.setattr(
         registro_rag,
-        "registrar_consulta",
-        lambda *args, **kwargs: next(llamadas),
+        "ejecutar_consulta",
+        ejecutar_consulta,
     )
     monkeypatch.setattr(
         registro_rag,
@@ -111,6 +122,7 @@ def test_main_normal_imprime_pasos_y_eventos_reales(
     assert '"trace_id": "trace-real-1"' in salida
     assert '"trace_id": "trace-real-2"' in salida
     assert "trace_id fuera de cualquier consulta: None" in salida
+    assert valores_k == [1, 1]
 
 
 def test_main_sin_pregunta_ejecuta_dos_consultas_y_muestra_paso_2(
@@ -124,6 +136,7 @@ def test_main_sin_pregunta_ejecuta_dos_consultas_y_muestra_paso_2(
                 "trace_id": trace_id,
                 "n_limpios": 1,
                 "n_descartados": 0 if numero == 2 else 1,
+                "costo_estimado_usd": None,
                 "eventos": [
                     {
                         "level": "INFO",
@@ -136,8 +149,12 @@ def test_main_sin_pregunta_ejecuta_dos_consultas_y_muestra_paso_2(
     llamadas = iter(registros)
     monkeypatch.setattr(
         registro_rag,
-        "registrar_consulta",
-        lambda *args, **kwargs: next(llamadas),
+        "ejecutar_consulta",
+        lambda *args, **kwargs: (
+            "Respuesta [1].",
+            {1: "fuente.md"},
+            next(llamadas),
+        ),
     )
     monkeypatch.setattr(
         registro_rag,
@@ -186,7 +203,6 @@ def test_registrar_consulta_mide_etapas_y_agrega_jsonl(
     registro = registro_rag.registrar_consulta(
         "¿Cuántas veces reintenta?",
         tmp_path / "vectorstore",
-        k=3,
         embeddings=embeddings,
         vectorstore=vectorstore,
         chat_model=modelo,
@@ -201,6 +217,7 @@ def test_registrar_consulta_mide_etapas_y_agrega_jsonl(
         "tiempos_ms",
         "tiempo_total_ms",
         "tokens",
+        "costo_estimado_usd",
         "n_limpios",
         "n_descartados",
         "eventos",
@@ -217,9 +234,13 @@ def test_registrar_consulta_mide_etapas_y_agrega_jsonl(
         abs=0.02,
     )
     assert registro["tokens"]["input_tokens"] == 150
+    assert registro["costo_estimado_usd"] == pytest.approx(0.000255)
+    assert registro["eventos"][-1]["costo_estimado_usd"] == pytest.approx(
+        0.000255
+    )
     guardado = json.loads(archivo.read_text(encoding="utf-8"))
     assert guardado == registro
-    vectorstore.as_retriever.assert_called_once_with(search_kwargs={"k": 3})
+    vectorstore.as_retriever.assert_called_once_with(search_kwargs={"k": 1})
     retriever.invoke.assert_called_once_with("¿Cuántas veces reintenta?")
     mensajes = modelo.invoke.call_args.args[0]
     assert "[1] Fuente: src/GATE_2/cliente.py" in mensajes[1].content
@@ -420,7 +441,8 @@ def test_actividad_core_imprime_pasos_compara_k_y_cuenta_jsonl(
         return {
             "pregunta": pregunta,
             "k": k,
-            "tokens": {"input_tokens": 144 if k == 3 else 203},
+            "tokens": {"input_tokens": 144 if k == 1 else 203},
+            "costo_estimado_usd": None,
         }
 
     monkeypatch.setattr(registro_rag, "registrar_consulta", registrar)
@@ -430,9 +452,9 @@ def test_actividad_core_imprime_pasos_compara_k_y_cuenta_jsonl(
     salida = capsys.readouterr().out
     assert len(registros) == 5
     assert "PASO 1: registrando 3 consultas distintas" in salida
-    assert "PASO 2: misma pregunta con k=3 y k=6" in salida
-    assert "k=3 -> input_tokens: 144" in salida
-    assert "k=6 -> input_tokens: 203" in salida
+    assert "PASO 2: misma pregunta con k=1 y k=2" in salida
+    assert "k=1 -> input_tokens: 144" in salida
+    assert "k=2 -> input_tokens: 203" in salida
     assert "registros.jsonl tiene 5 líneas" in salida
     assert len(archivo.read_text(encoding="utf-8").splitlines()) == 5
 

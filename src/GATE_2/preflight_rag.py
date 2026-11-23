@@ -21,6 +21,8 @@ def preflight_check(
 
     if not directorio.is_dir():
         problemas.append(f"{nombre_carpeta} no existe: corriste la indexación?")
+    elif not any(elemento.is_file() for elemento in directorio.rglob("*")):
+        problemas.append(f"{nombre_carpeta} existe pero esta vacio.")
 
     if not gitignore.exists():
         problemas.append(f"no existe {gitignore.name} en este proyecto")
@@ -45,7 +47,10 @@ def main() -> int:
             print(f" - {problema}")
         return 1
 
-    print("Preflight OK: la carpeta del índice existe y está en .gitignore")
+    print(
+        "Preflight OK: la carpeta del indice existe, no esta vacia "
+        "y esta en .gitignore"
+    )
     return 0
 
 
