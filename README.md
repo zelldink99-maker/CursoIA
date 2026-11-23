@@ -532,6 +532,15 @@ requieren red ni credenciales:
 python -m pytest test_gate2.py -v
 ```
 
+Con `-v`, pytest imprime el nombre de cada prueba. En esta versión son
+`test_1_pipeline_indexa_recupera_y_responde_sin_excepciones`,
+`test_2_respuesta_cita_una_fuente_recuperada`,
+`test_3_registro_no_persiste_consulta_ni_pii` y
+`test_4_supervision_pausa_y_reanuda_con_decision_humana`. El encabezado de
+sesión, los datos de plataforma y el tiempo total dependen de la versión de
+pytest, sus plugins y el equipo; por eso una salida de ejemplo puede no
+coincidir carácter por carácter con la consola.
+
 La respuesta usa citas numeradas (`[1]`) y el mapa `fuentes` asocia cada número
 con el archivo recuperado. El registro JSONL contiene solo la longitud de la
 pregunta, conteos, tiempos, tokens, costo estimado y `trace_id`; no persiste la
@@ -631,6 +640,11 @@ riesgos. Si el vector store conserva rutas del paquete anterior, el código
 migra IDs y metadatos cuando el contenido coincide exactamente, sin recalcular
 embeddings.
 
+El modo `--demo-trazas` imprime en consola los tres pasos del ejemplo: pipeline
+con respuesta, dos consultas con distintos `trace_id` y abstención cuando el
+contexto recuperado es sospechoso. Es una salida ilustrativa local, no una
+consulta real a Gemini.
+
 ```console
 python -m src.GATE_2.registro_rag --pregunta "¿Qué errores reintenta el cliente?" --k 3
 python -m src.GATE_2.registro_rag --demo-trazas
@@ -643,31 +657,56 @@ pruebas y la matriz de riesgos no llaman a servicios externos. La guía con el
 flujo de aprobación, límites, ejemplo de callbacks y política de logs está en
 [docs/bloque-31-seguridad-trazas-supervision.md](docs/bloque-31-seguridad-trazas-supervision.md).
 
-## Revisar GATE_2
+## Verificaciones y revisión de GATE_2
 
-Desde la raíz del repositorio ejecuta el verificador:
+Hay dos verificaciones distintas; una no sustituye a la otra.
+
+### Autochequeo de los cuatro criterios no compensables
+
+Ejecuta desde la raíz:
+
+```console
+python -m pytest test_gate2.py -v
+```
+
+Estas cuatro pruebas locales comprueban el pipeline de punta a punta con
+servicios simulados, las citas, que el registro no persista la consulta ni el
+correo de prueba, y que la supervisión humana pause y reanude el grafo. No
+requieren Gemini ni validan por sí solas todas las dimensiones de la entrega.
+La salida muestra los nombres actuales de las pruebas; el encabezado y la
+duración dependen del entorno. Consulta la sección
+[Gate 2: autochequeo integrado y rúbrica](#gate-2-autochequeo-integrado-y-rúbrica)
+para los detalles.
+
+### Verificador general del repositorio
+
+`revision_gate_2.py` es un verificador más amplio de módulos y actividades del
+proyecto. **No es el autochequeo de los cuatro criterios ni un resultado de
+aprobación del Gate 2.** Desde la raíz, ejecútalo con:
 
 ```console
 python src/GATE_2/revision_gate_2.py
 ```
 
-Describe los módulos de GATE_2 y el banco de prompts; valida sintaxis,
-dependencias, imports y credenciales, y ejecuta pruebas locales simuladas,
-incluidas las de clasificación de errores, reintentos, backoff, costo por
-operación y validación de respuestas. También incorpora la revisión de
-`pipeline_texto.py`, `evaluar_salidas.py`, `evaluar_metricas.py` y
-`revisar_cualitativamente.py`; comprueba también la chain de tres pasos de
-LangChain y el enrutamiento condicional usando modelos simulados, además de las
-herramientas estructuradas del agente y el aislamiento de sesiones sin invocar
-el modelo. Estas comprobaciones locales no llaman a Gemini. Reporta como
-pendiente la actividad core mientras falten los
-resultados, la revisión manual o los hallazgos documentados.
+Este verificador describe los módulos y el banco de prompts, valida sintaxis,
+dependencias, imports y credenciales, y ejecuta comprobaciones locales
+simuladas de otros componentes. Algunas actividades históricas requieren
+resultados, revisión manual o hallazgos documentados; por eso puede terminar
+con estado distinto de cero aunque `test_gate2.py` pase.
 
-Para ejecutar solo comprobaciones locales sin llamar a la API real:
+Para omitir las comprobaciones que llaman a la API:
 
 ```console
 python src/GATE_2/revision_gate_2.py --omitir-api
 ```
+
+`--omitir-api` evita las llamadas reales; no completa resultados faltantes ni
+la revisión manual de esas actividades. En la verificación del 23 de noviembre
+de 2026, el autochequeo de los cuatro criterios pasó, pero este verificador
+general devolvió código 1 por resultados y revisiones manuales pendientes de
+una actividad anterior. El estado vigente, las evidencias de Gate 2 y los
+pendientes de latencia y entrega están en el
+[checklist verificable del Gate 2](docs/checklist_gate2.md).
 
 Si se cancela la carga o ejecución con Ctrl+C, el verificador informa la
 cancelación y termina sin mostrar el traceback de Python.

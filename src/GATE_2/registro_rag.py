@@ -325,113 +325,86 @@ def imprimir_consulta_trazada(
 
 
 def imprimir_demo_trazas() -> None:
-    """Imprime una demostración local con el formato del flujo RAG instrumentado."""
-    separador = "=" * 66
+    """Imprime los tres escenarios de trazas del ejercicio sin usar la API."""
+    separador = "=" * 74
+
+    def imprimir_eventos(eventos: Sequence[dict[str, Any]]) -> None:
+        for evento in eventos:
+            print(json.dumps(evento, ensure_ascii=False))
+
     print(separador)
-    print("PASO 1: consulta 1 (un documento limpio y uno con inyeccion)")
+    print("PASO 1: indexar, recuperar, filtrar y responder (con traza)")
     print(separador)
-    print(
-        json.dumps(
+    imprimir_eventos(
+        [
+            {"evento": "consulta_recibida", "trace_id": "trace-2193"},
             {
-                "ts": "2026-10-05T00:35:21",
-                "level": "INFO",
-                "msg": "consulta recibida",
-                "trace_id": "trace-85883",
-                "pregunta_len": 35,
+                "evento": "documentos_recuperados",
+                "trace_id": "trace-2193",
+                "n": 2,
             },
-            ensure_ascii=False,
-        )
-    )
-    print(
-        json.dumps(
             {
-                "ts": "2026-10-05T00:35:21",
-                "level": "WARNING",
-                "msg": "documento descartado por inyeccion",
-                "trace_id": "trace-85883",
-                "evento": "documento_descartado_por_inyeccion",
-                "fuente": "comentario.txt",
-                "n_patrones": 3,
-            },
-            ensure_ascii=False,
-        )
-    )
-    print(
-        json.dumps(
-            {
-                "ts": "2026-10-05T00:35:21",
-                "level": "INFO",
-                "msg": "contexto filtrado",
-                "trace_id": "trace-85883",
-                "evento": "contexto_filtrado",
-                "n_limpios": 1,
-                "n_descartados": 1,
-            },
-            ensure_ascii=False,
-        )
-    )
-    print(
-        json.dumps(
-            {
-                "ts": "2026-10-05T00:35:21",
-                "level": "INFO",
-                "msg": "consumo registrado",
-                "trace_id": "trace-85883",
                 "evento": "consumo_llm",
-                "input_tokens": 210,
-                "output_tokens": 18,
-                "total_tokens": 228,
+                "trace_id": "trace-2193",
+                "input_tokens": 180,
+                "output_tokens": 22,
             },
-            ensure_ascii=False,
-        )
+        ]
+    )
+    print(
+        "respuesta final: Según el manual.pdf, la política de devoluciones "
+        "permite 30 días."
     )
 
     print()
     print(separador)
-    print("PASO 2: consulta 2 (otra traza, sin mezclarse con la anterior)")
+    print("PASO 2: dos consultas seguidas, cada una con su trace_id")
     print(separador)
-    print(
-        json.dumps(
+    imprimir_eventos(
+        [
+            {"evento": "consulta_recibida", "trace_id": "trace-2193"},
             {
-                "ts": "2026-10-05T00:35:21",
-                "level": "INFO",
-                "msg": "consulta recibida",
-                "trace_id": "trace-88456",
-                "pregunta_len": 21,
+                "evento": "documentos_recuperados",
+                "trace_id": "trace-2193",
+                "n": 2,
             },
-            ensure_ascii=False,
-        )
-    )
-    print(
-        json.dumps(
             {
-                "ts": "2026-10-05T00:35:21",
-                "level": "INFO",
-                "msg": "contexto filtrado",
-                "trace_id": "trace-88456",
-                "evento": "contexto_filtrado",
-                "n_limpios": 1,
-                "n_descartados": 0,
-            },
-            ensure_ascii=False,
-        )
-    )
-    print(
-        json.dumps(
-            {
-                "ts": "2026-10-05T00:35:21",
-                "level": "INFO",
-                "msg": "consumo registrado",
-                "trace_id": "trace-88456",
                 "evento": "consumo_llm",
-                "input_tokens": 210,
-                "output_tokens": 18,
-                "total_tokens": 228,
+                "trace_id": "trace-2193",
+                "input_tokens": 180,
+                "output_tokens": 22,
             },
-            ensure_ascii=False,
-        )
+            {"evento": "consulta_recibida", "trace_id": "trace-1385"},
+            {
+                "evento": "documentos_recuperados",
+                "trace_id": "trace-1385",
+                "n": 2,
+            },
+            {
+                "evento": "consumo_llm",
+                "trace_id": "trace-1385",
+                "input_tokens": 180,
+                "output_tokens": 22,
+            },
+        ]
     )
-    print("\ntrace_id fuera de cualquier consulta: None")
+    print("trace_id fuera de cualquier consulta: None")
+
+    print()
+    print(separador)
+    print("PASO 3: si todo el contexto recuperado es sospechoso")
+    print(separador)
+    imprimir_eventos(
+        [
+            {
+                "evento": "sin_contexto_confiable",
+                "trace_id": "trace-7421",
+                "n_recuperados": 1,
+                "n_descartados": 1,
+            }
+        ]
+    )
+    print("No tengo información suficiente y verificada para responder esto.")
 
 
 def ejecutar_actividad_core(
@@ -566,4 +539,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     raise SystemExit(main())

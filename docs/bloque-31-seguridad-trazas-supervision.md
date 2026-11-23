@@ -76,8 +76,11 @@ python -m src.GATE_2.registro_rag --demo-trazas
 ```
 
 `--demo-trazas` usa datos locales y no consulta embeddings ni Gemini. Imprime
-dos consultas independientes, el descarte de un documento con patrones
-sospechosos y el estado de `trace_id` fuera de cualquier consulta.
+los tres pasos del ejemplo completo: una consulta con su respuesta y traza, dos
+consultas con identificadores independientes, y el caso en que todo el contexto
+recuperado se descarta y el sistema se abstiene. Los tokens, identificadores y
+respuesta de la demostración son ilustrativos; para ejecutar una consulta RAG
+real usa el comando `--pregunta`, que requiere credenciales.
 
 Cada línea de `registros_latencia_costo.jsonl` incluye longitudes, conteos,
 tiempos, uso y costo estimado por tokens, pero omite la pregunta, la respuesta

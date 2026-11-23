@@ -24,6 +24,15 @@ Ejecuta estas cuatro comprobaciones sin llamar a Gemini:
 python -m pytest test_gate2.py -v
 ```
 
+Con `-v`, la consola muestra los nombres actuales de las cuatro pruebas:
+`test_1_pipeline_indexa_recupera_y_responde_sin_excepciones`,
+`test_2_respuesta_cita_una_fuente_recuperada`,
+`test_3_registro_no_persiste_consulta_ni_pii` y
+`test_4_supervision_pausa_y_reanuda_con_decision_humana`. El encabezado de
+sesión, la plataforma y la duración cambian según la versión de pytest, sus
+plugins y el equipo; el bloque de salida del curso es ilustrativo, no una
+salida que deba coincidir exactamente.
+
 ## Seis dimensiones de la rúbrica
 
 - [x] **Pipeline RAG (25 %):** índice persistido de cinco chunks base; las
