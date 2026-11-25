@@ -2,6 +2,24 @@
 
 Los cambios importantes del proyecto se documentan en este archivo.
 
+## [No publicado] - 2026-11-25
+
+### Añadido
+
+- Ficha de diseño funcional del proyecto propio en
+  `docs/ficha_diseno_funcional.md`, orientada a la revisión de datos post-ETL
+  y a los reportes de calidad y ventas.
+- Diagrama de arquitectura en `docs/diagrama_arquitectura.png` y generador
+  reproducible en `scripts/generar_diagrama_arquitectura.py`.
+- Verificador estructural `verificar_ficha.py` para las secciones 1 a 3.
+- Presupuesto adaptable del MVP en
+  `presupuesto/presupuesto_alcance.py`.
+
+### Cambiado
+
+- README: se documentaron los comandos del Bloque 33 y la ubicación de la ficha,
+  el diagrama y el presupuesto.
+
 ## Updates - 2026-11-23 — Integración final de Gate 2
 
 Responsable: Igor Inostroza
