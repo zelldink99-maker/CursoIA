@@ -11,6 +11,33 @@ preguntas a la API de Gemini, la medición de latencia, la estimación del costo
 de los tokens de una respuesta y la validación local de módulos auxiliares del
 proyecto.
 
+## Ficha de diseño funcional — Bloque 33
+
+El proyecto propio está documentado en
+[docs/ficha_diseno_funcional.md](docs/ficha_diseno_funcional.md). La ficha
+describe un asistente de revisión de datos post-ETL con dos reportes:
+calidad de datos y resultados de ventas.
+
+El diagrama de arquitectura se encuentra en
+[docs/diagrama_arquitectura.png](docs/diagrama_arquitectura.png). Para
+regenerarlo desde la raíz:
+
+```console
+python scripts/generar_diagrama_arquitectura.py
+```
+
+Para comprobar que las secciones 1 a 3 están completas:
+
+```console
+python verificar_ficha.py
+```
+
+El presupuesto ilustrativo puede ajustarse y ejecutarse desde la raíz:
+
+```console
+python presupuesto/presupuesto_alcance.py
+```
+
 ## Cómo empezar
 
 Después de clonar el repositorio o descomprimir el proyecto, abre una terminal
