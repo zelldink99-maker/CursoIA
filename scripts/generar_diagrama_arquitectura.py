@@ -1,11 +1,12 @@
+from math import hypot
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 
 SALIDA = Path("docs/diagrama_arquitectura.png")
-ANCHO = 1400
-ALTO = 860
+ANCHO = 1500
+ALTO = 900
 
 
 def fuente(nombre, tamano):
@@ -21,32 +22,36 @@ def dibujar():
     azul = (45, 110, 170)
     claro = (230, 240, 250)
     gris = (70, 70, 70)
+    borde = (125, 135, 145)
 
     titulo = fuente("arial.ttf", 34)
     encabezado = fuente("arial.ttf", 24)
     normal = fuente("arial.ttf", 18)
     caja = fuente("arial.ttf", 20)
 
-    dibujo.text(
-        (45, 25),
-        "Arquitectura: revision de datos post-ETL",
-        font=titulo,
-        fill=(20, 60, 100),
-    )
+    dibujo.text((45, 25), "Arquitectura: revision de datos post-ETL",
+                font=titulo, fill=(20, 60, 100))
 
     componentes = [
-        (40, 130, 300, 220, "Archivo CSV simulado"),
-        (40, 300, 300, 390, "Proceso ETL"),
-        (40, 470, 300, 560, "Datos procesados"),
-        (390, 130, 650, 220, "Usuario"),
-        (390, 300, 650, 390, "Servicio FastAPI"),
-        (740, 300, 1000, 390, "LangGraph"),
-        (1090, 130, 1340, 220, "Chroma"),
-        (1090, 300, 1340, 390, "Modelo"),
-        (1090, 470, 1340, 560, "Calculos controlados"),
-        (740, 650, 1000, 740, "Respuesta JSON"),
-        (1090, 650, 1340, 740, "Docker"),
+        (35, 275, 235, 355, "Usuario"),
+        (35, 610, 235, 690, "CSV de ventas"),
+        (300, 280, 510, 360, "FastAPI"),
+        (610, 280, 820, 360, "LangGraph"),
+        (300, 620, 510, 700, "Proceso ETL"),
+        (610, 620, 820, 700, "Datos procesados"),
+        (610, 470, 820, 550, "Calculos controlados"),
+        (900, 470, 1110, 550, "Chroma"),
+        (1200, 280, 1460, 360, "Modelo"),
     ]
+
+    dibujo.rounded_rectangle(
+        (265, 190, 1145, 770),
+        radius=24,
+        outline=borde,
+        width=3,
+    )
+    dibujo.text((285, 200), "Docker: servicio, datos procesados e indice",
+                font=encabezado, fill=gris)
 
     for x1, y1, x2, y2, texto in componentes:
         dibujo.rounded_rectangle(
@@ -63,53 +68,49 @@ def dibujar():
             fill=(20, 40, 70),
         )
 
-    dibujo.text((35, 100), "ENTRADA Y ETL", font=encabezado, fill=gris)
-    dibujo.text((385, 100), "EXPUESTO", font=encabezado, fill=gris)
-    dibujo.text((735, 270), "ORQUESTACION", font=encabezado, fill=gris)
-    dibujo.text((1085, 100), "IA Y DATOS", font=encabezado, fill=gris)
-
-    def flecha(x1, y1, x2, y2, etiqueta):
-        dibujo.line((x1, y1, x2, y2), fill=azul, width=4)
+    def punta(x, y, dx, dy):
+        longitud = hypot(dx, dy)
+        ux = dx / longitud
+        uy = dy / longitud
+        base_x = x - 12 * ux
+        base_y = y - 12 * uy
         dibujo.polygon(
-            [(x2, y2), (x2 - 12, y2 - 8), (x2 - 12, y2 + 8)],
+            [
+                (x, y),
+                (base_x - 7 * uy, base_y + 7 * ux),
+                (base_x + 7 * uy, base_y - 7 * ux),
+            ],
             fill=azul,
         )
-        dibujo.text(
-            ((x1 + x2) // 2 - 45, (y1 + y2) // 2 - 22),
-            etiqueta,
-            font=normal,
-            fill=gris,
-        )
 
-    flecha(170, 220, 170, 300, "CSV origen")
-    flecha(170, 390, 170, 470, "filas procesadas")
-    flecha(300, 345, 390, 345, "filas y pregunta")
-    flecha(650, 345, 740, 345, "pregunta")
-    flecha(870, 390, 870, 650, "tipo de reporte")
-    flecha(1000, 345, 1090, 175, "definiciones")
-    flecha(1215, 220, 1215, 300, "API externa")
-    flecha(1215, 390, 1215, 470, "indicadores")
-    flecha(1090, 510, 1000, 695, "metricas")
-    flecha(740, 695, 650, 695, "respuesta JSON")
-    flecha(650, 695, 390, 695, "respuesta al usuario")
+    def flecha(x1, y1, x2, y2, etiqueta, tx, ty):
+        dibujo.line((x1, y1, x2, y2), fill=azul, width=4)
+        punta(x2, y2, x2 - x1, y2 - y1)
+        dibujo.text((tx, ty), etiqueta, font=normal, fill=gris)
 
-    dibujo.rectangle(
-        (20, 250, 1360, 780),
-        outline=(150, 150, 150),
-        width=2,
-    )
-    dibujo.text(
-        (30, 805),
-        "Contenedor Docker: FastAPI + LangGraph + dependencias",
-        font=caja,
-        fill=gris,
-    )
-    dibujo.text(
-        (30, 830),
-        "Clave de API: variable de entorno",
-        font=normal,
-        fill=gris,
-    )
+    def flecha_doble(x1, y1, x2, y2, etiqueta, tx, ty):
+        dibujo.line((x1, y1, x2, y2), fill=azul, width=4)
+        punta(x1, y1, x1 - x2, y1 - y2)
+        punta(x2, y2, x2 - x1, y2 - y1)
+        dibujo.text((tx, ty), etiqueta, font=normal, fill=gris)
+
+    flecha(235, 315, 300, 315, "pregunta", 235, 285)
+    flecha(300, 345, 235, 345, "respuesta JSON", 225, 365)
+    flecha(235, 650, 300, 650, "archivo CSV", 225, 620)
+    flecha(510, 320, 610, 320, "consulta", 525, 285)
+    flecha(510, 660, 610, 660, "filas limpias", 515, 625)
+    flecha(715, 360, 715, 470, "calcular reporte", 725, 395)
+    flecha(715, 620, 715, 550, "filas limpias", 725, 575)
+    flecha_doble(820, 330, 900, 485, "consulta", 825, 405)
+    flecha(820, 300, 1200, 300, "solicitud al modelo", 900, 265)
+    flecha(1200, 340, 820, 340, "texto de respuesta", 940, 350)
+
+    dibujo.text((1190, 410), "Gemini: API externa", font=encabezado, fill=gris)
+    dibujo.text((1190, 465), "Clave: variable de entorno", font=normal, fill=gris)
+    dibujo.text((1190, 495), "No se guarda en el repositorio", font=normal, fill=gris)
+    dibujo.text((35, 790),
+                "FastAPI, LangGraph y Chroma se ejecutan dentro del contenedor.",
+                font=normal, fill=gris)
 
     SALIDA.parent.mkdir(parents=True, exist_ok=True)
     imagen.save(SALIDA)
