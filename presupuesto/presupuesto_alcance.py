@@ -46,6 +46,9 @@ funcionalidades = [
     {"id": "RF-12", "horas": 4, "capa": "otra",
      "nombre": "Correccion automatica de datos de origen",
      "tipo": "fuera", "novedad": False, "sistema_real": False},
+    {"id": "RNF-04", "horas": 1, "capa": "contenedor",
+     "nombre": "Empaquetado y arranque con Docker",
+     "tipo": "imprescindible", "novedad": True, "sistema_real": False},
 ]
 
 

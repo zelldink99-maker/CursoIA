@@ -11,12 +11,15 @@ preguntas a la API de Gemini, la medición de latencia, la estimación del costo
 de los tokens de una respuesta y la validación local de módulos auxiliares del
 proyecto.
 
-## Ficha de diseño funcional — Bloque 33
+## Ficha de diseño funcional — Bloques 33 y 34
 
 El proyecto propio está documentado en
 [docs/ficha_diseno_funcional.md](docs/ficha_diseno_funcional.md). La ficha
-describe un asistente de revisión de datos post-ETL con dos reportes:
-calidad de datos y resultados de ventas.
+describe los requerimientos del asistente de revisión de datos post-ETL, sus
+criterios de aceptación y el plan de construcción por hitos.
+El conjunto pequeño y reproducible para comprobar los reportes está en
+[data/ventas_prueba.csv](data/ventas_prueba.csv).
+Sus registros de ventas corresponden a noviembre de 2026.
 
 El diagrama de arquitectura se encuentra en
 [docs/diagrama_arquitectura.png](docs/diagrama_arquitectura.png). Para
@@ -26,11 +29,24 @@ regenerarlo desde la raíz:
 python scripts/generar_diagrama_arquitectura.py
 ```
 
-Para comprobar que las secciones 1 a 3 están completas:
+Para comprobar la estructura inicial de la ficha:
 
 ```console
 python verificar_ficha.py
 ```
+
+Los scripts `ficha_datos.py` y `resumen_ficha.py` leen la ficha y muestran la
+cobertura de criterios, requerimientos y horas planificadas. Para verificar
+las cinco secciones y el registro de revisión cruzada:
+
+```console
+python resumen_ficha.py
+python verificar_ficha_completa.py
+```
+
+La verificación integral comprueba el formato y la coherencia del registro en
+`docs/revision_alcance.md`, incluida la identificación del revisor, la fecha,
+los hallazgos y sus decisiones.
 
 El presupuesto ilustrativo puede ajustarse y ejecutarse desde la raíz:
 

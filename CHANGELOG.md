@@ -4,8 +4,18 @@ Los cambios importantes del proyecto se documentan en este archivo.
 
 ## [No publicado] - 2026-11-25
 
+Responsable: Igor Inostroza
+
 ### Añadido
 
+- Criterios de aceptacion medibles y plan por hitos de los Bloques 34 en
+  `docs/ficha_diseno_funcional.md`.
+- Registro de autorrevision del proyecto en `docs/revision_alcance.md`.
+- `ficha_datos.py`, `resumen_ficha.py` y `verificar_ficha_completa.py` para
+  extraer, resumir y validar la ficha completa.
+- Pruebas de ficha y presupuesto en `tests/test_ficha_diseno_funcional.py`.
+- `data/ventas_prueba.csv`: conjunto pequeño con dos ventas validas, una fila
+  duplicada y un importe faltante para hacer reproducibles los criterios.
 - Ficha de diseño funcional del proyecto propio en
   `docs/ficha_diseno_funcional.md`, orientada a la revisión de datos post-ETL
   y a los reportes de calidad y ventas.
@@ -19,6 +29,13 @@ Los cambios importantes del proyecto se documentan en este archivo.
 
 - README: se documentaron los comandos del Bloque 33 y la ubicación de la ficha,
   el diagrama y el presupuesto.
+- README: se añadieron los comandos del Bloque 34 y se documentó la validación
+  del registro de autorrevisión.
+- Revisión técnica de la ficha: se reforzó CA-09 para comprobar los conteos
+  agregados y se añadió CA-11 para validar periodo y origen del reporte de
+  calidad; ambos quedaron enlazados con sus hitos.
+- CSV de prueba y criterios de aceptación actualizados para usar noviembre de
+  2026; registro de autorrevisión atribuido a Igor Inostroza.
 
 ## Updates - 2026-11-23 — Integración final de Gate 2
 
